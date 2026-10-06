@@ -18,7 +18,7 @@ flowchart TB
     end
 
     subgraph Presentation["User & API Surfaces"]
-        WebUI["Next.js 14.2.5+ Web Portal & Dashboard"]
+        WebUI["Next.js 16.3.3 Web Portal & Dashboard"]
         SlackInt["Slack Interface (AgentOS Events)"]
         TgInt["Telegram Interface (AgentOS Webhook)"]
         MCPClient["Claude / Cursor / ChatGPT via /mcp"]

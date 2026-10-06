@@ -56,6 +56,8 @@ def _generate_mock_instance_dict(model_cls: type[BaseModel]) -> dict[str, Any]:
                     "https://news.ycombinator.com/item?id=123",
                     "https://stripe.com/blog/agents",
                 ]
+            elif args and (args[0] is dict or getattr(args[0], "__origin__", None) is dict):
+                data[name] = [{"type": "section", "text": "Mock block content"}]
             else:
                 data[name] = ["mock_item_1"]
         elif origin is dict:

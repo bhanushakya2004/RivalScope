@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
 
+from app.api.v1 import api_v1_router
 from app.config import Settings, get_settings
 from app.core.errors import RivalScopeError, rivalscope_exception_handler
 from app.core.logging import get_logger, setup_logging
@@ -150,6 +151,9 @@ def create_application() -> FastAPI:
 
     # Register Exception Handlers
     base_app.add_exception_handler(RivalScopeError, rivalscope_exception_handler)
+
+    # RivalScope domain API v1 endpoints
+    base_app.include_router(api_v1_router)
 
     # Health & Readiness Endpoints
     @base_app.get("/health", tags=["System"])

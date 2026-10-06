@@ -34,6 +34,45 @@ def seed_database(db: Session) -> None:
     # Check if already seeded
     existing = db.query(Tenant).filter(Tenant.slug == "paypulse").first()
     if existing:
+        doc2 = db.query(RawDocument).filter(RawDocument.id == "doc-adyen-unified").first()
+        if not doc2:
+            now = datetime.now(UTC)
+            adyen = db.query(Company).filter(Company.id == "c-comp-adyen").first()
+            revolut = db.query(Company).filter(Company.id == "c-comp-revolut").first()
+            if adyen:
+                db.add(
+                    RawDocument(
+                        id="doc-adyen-unified",
+                        tenant_id=existing.id,
+                        company_id=adyen.id,
+                        source_id="s-adyen-press",
+                        url="https://www.adyen.com/press-and-media/q3-2026-financial-results",
+                        canonical_url="https://www.adyen.com/press-and-media/q3-2026-financial-results",
+                        content="Adyen unified commerce POS expansion drives 32% North America volume growth across enterprise acquiring.",
+                        content_hash="hash-adyen-unified-sha256",
+                        simhash=204928502948502,
+                        provider="firecrawl",
+                        fetched_at=now - timedelta(days=3),
+                    )
+                )
+            if revolut:
+                db.add(
+                    RawDocument(
+                        id="doc-revolut-charter",
+                        tenant_id=existing.id,
+                        company_id=revolut.id,
+                        source_id="s-revolut-careers",
+                        url="https://www.revolut.com/news/us-banking-license-application",
+                        canonical_url="https://www.revolut.com/news/us-banking-license-application",
+                        content="Revolut accelerates US banking license application and regulatory compliance recruitment.",
+                        content_hash="hash-revolut-charter-sha256",
+                        simhash=304928502948502,
+                        provider="firecrawl",
+                        fetched_at=now - timedelta(days=1),
+                    )
+                )
+            db.commit()
+            print("[seed] Populated missing benchmark documents for Adyen and Revolut.")
         print("[seed] Database already seeded. Skipping.")
         return
 
@@ -182,6 +221,37 @@ def seed_database(db: Session) -> None:
     )
     db.add(signal_1)
 
+    raw_doc_2 = RawDocument(
+        id="doc-adyen-unified",
+        tenant_id=tenant.id,
+        company_id=adyen.id,
+        source_id="s-adyen-press",
+        url="https://www.adyen.com/press-and-media/q3-2026-financial-results",
+        canonical_url="https://www.adyen.com/press-and-media/q3-2026-financial-results",
+        content="Adyen unified commerce POS expansion drives 32% North America volume growth across enterprise acquiring.",
+        content_hash="hash-adyen-unified-sha256",
+        simhash=204928502948502,
+        provider="firecrawl",
+        fetched_at=now - timedelta(days=3),
+    )
+    db.add(raw_doc_2)
+
+    raw_doc_3 = RawDocument(
+        id="doc-revolut-charter",
+        tenant_id=tenant.id,
+        company_id=revolut.id,
+        source_id="s-revolut-careers",
+        url="https://www.revolut.com/news/us-banking-license-application",
+        canonical_url="https://www.revolut.com/news/us-banking-license-application",
+        content="Revolut accelerates US banking license application and regulatory compliance recruitment.",
+        content_hash="hash-revolut-charter-sha256",
+        simhash=304928502948502,
+        provider="firecrawl",
+        fetched_at=now - timedelta(days=1),
+    )
+    db.add(raw_doc_3)
+    db.flush()
+
     signal_2 = Signal(
         id="sig-adyen-1",
         tenant_id=tenant.id,
@@ -192,7 +262,7 @@ def seed_database(db: Session) -> None:
         event_date=now - timedelta(days=3),
         confidence=0.92,
         importance_score=7,
-        evidence_ids=[],
+        evidence_ids=[raw_doc_2.id],
     )
     db.add(signal_2)
 
@@ -206,7 +276,7 @@ def seed_database(db: Session) -> None:
         event_date=now - timedelta(days=1),
         confidence=0.88,
         importance_score=8,
-        evidence_ids=[],
+        evidence_ids=[raw_doc_3.id],
     )
     db.add(signal_3)
 

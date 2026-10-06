@@ -1,12 +1,14 @@
-# RivalScope: Autonomous Multi-Agent Competitive Intelligence for Fintech
+# RivalScope
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB.svg?logo=python)](https://python.org)
 [![Agno](https://img.shields.io/badge/Agno-3.1.1-purple.svg)](https://agno.com)
-[![Next.js](https://img.shields.io/badge/Next.js-14-black.svg?logo=next.js)](https://nextjs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-16.3.3-black.svg?logo=next.js)](https://nextjs.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20%2B%20pgvector-336791.svg?logo=postgresql)](https://github.com/pgvector/pgvector)
 
-RivalScope is an open-source, self-hostable, multi-agent Competitive Intelligence platform tailored for the fintech vertical (payments, neobanks, lending, crypto, and wealthtech). It features plug-and-play architecture, a bidirectional Model Context Protocol (MCP) gateway, four-layer memory, and multi-stage deduplication.
+RivalScope is an open-source, self-hostable competitive-intelligence workspace for fintech teams. It turns public competitor activity into cited signals, reports, and actionable context, with a tenant-scoped MCP gateway for approved internal tools.
+
+The repository runs in deterministic mock mode by default: no LLM, search, or crawl API key is needed for the local demo. Real provider integrations are opt-in through environment variables.
 
 ---
 
@@ -79,8 +81,11 @@ flowchart TB
 - **Bidirectional MCP**:
   - **MCP Server**: Exposes RivalScope capabilities at `/mcp` for Claude, Cursor, and ChatGPT.
   - **MCP Gateway**: Allows tenants to connect their own internal MCP servers (CRM, Snowflake, Jira) with strict SSRF defense, envelope encryption, and tool allowlisting.
-- **100% Offline Demo Mode**:
-  - Runs end-to-end with zero API keys required via deterministic mock providers.
+- **Offline Demo Mode**:
+  - Deterministic mock providers and `MockModel` support local development and tests without external API keys.
+- **Professional Web Experience**:
+  - A public landing page explains the intelligence workflow, compliance posture, and MCP gateway.
+  - The responsive workspace loads live companies and signals from `/api/v1` when the backend is reachable, then gracefully falls back to demo data.
 
 ---
 
@@ -93,8 +98,8 @@ flowchart TB
 git clone https://github.com/rivalscope/rivalscope.git
 cd rivalscope
 
-# Copy environment template
-cp .env.example .env
+# Copy environment template (PowerShell)
+Copy-Item .env.example .env
 
 # Start infrastructure (PostgreSQL with pgvector, Redis)
 make up
@@ -103,7 +108,7 @@ make up
 make demo
 ```
 
-Visit the Web UI at `http://localhost:3000` or inspect the API at `http://localhost:7777/docs`.
+Visit the product overview at `http://localhost:3000`, the workspace at `http://localhost:3000/dashboard`, or inspect the API at `http://localhost:7777/docs`.
 
 ### 2. Connect Real Providers
 
@@ -133,6 +138,38 @@ Edit `.env` to configure your API keys:
 
 ---
 
+## API Status
+
+The backend currently mounts **20 versioned domain routes** under `/api/v1`. In development/mock mode, the API uses the seeded demo user when no bearer token is supplied. Production access must use authenticated JWT context; tenant IDs are never browser-supplied routing parameters.
+
+| Area | Available routes |
+| --- | --- |
+| Auth | `POST /auth/login`, `GET /auth/me` |
+| Companies | `GET/POST /companies`, `GET/DELETE /companies/{company_id}` |
+| Signals | `GET /signals`, `GET /signals/{signal_id}` |
+| Reports | `GET /reports`, `POST /reports/generate`, `GET /reports/{report_id}` |
+| Schedules | `GET/POST /schedules`, `POST /schedules/{schedule_id}/run-now` |
+| MCP gateway | `GET/POST /mcp-servers`, `PATCH /mcp-servers/{server_id}/policies` |
+| Memory | `GET/POST /memory/preferences`, `GET /memory/timeline` |
+
+The typed browser client lives in `frontend/lib/api.ts`. It supplies the dashboard and competitor screens with live API data when available.
+
+---
+
+## MCP Gateway
+
+RivalScope can act as an MCP server and can connect tenant-approved external MCP servers. The gateway is deliberately restrictive:
+
+- Streamable HTTP is the default transport; `stdio` is disabled by default.
+- Credentials are encrypted at rest and hosted connectors use OAuth (`mcp_auth`).
+- Per-tenant server registries and tool allowlists prevent accidental cross-tenant tool exposure.
+- SSRF controls block local, private, metadata, CGNAT, and IPv6 local ranges; DNS is re-resolved at connect time and redirects are validated before following.
+- Write-capable tools require human approval and are excluded from unattended schedules.
+
+See [the MCP Gateway ADR](docs/adr/0004-mcp-gateway-security-and-isolation.md) for the security model.
+
+---
+
 ## How to Extend
 
 ### Add a New Data Provider
@@ -147,7 +184,7 @@ Edit `.env` to configure your API keys:
 3. Register the agent in `app/agents/orchestrator.py`.
 
 ### Register a Tenant MCP Server
-1. Navigate to **MCP Gateway** in the Web UI or call `POST /api/v1/mcp/servers`.
+1. Navigate to **MCP Gateway** in the Web UI or call `POST /api/v1/mcp-servers`.
 2. Supply transport (`streamable-http`), URL, and authentication headers.
 3. Test connectivity and selectively allowlist tools in the policy manager.
 
@@ -155,6 +192,10 @@ Edit `.env` to configure your API keys:
 
 ## Legal & Compliance Notes
 See [Legal & Data Sources](docs/legal-data-sources.md) for full compliance guidelines. RivalScope operates strictly on public data, respects `robots.txt`, enforces rate limits, and rejects scrapers of forbidden sites (including LinkedIn).
+
+## Current Status
+
+This is an active implementation, not a claim that every item in the long-term architecture is complete. The core models, mock providers, ingestion/deduplication, memory facade, agent/workflow modules, API routers, MCP policy foundations, and frontend are present. Production provider setup, full API coverage, migrations, delivery verification, and end-to-end hardening remain ongoing work.
 
 ## License
 Apache License 2.0. See [LICENSE](LICENSE).
