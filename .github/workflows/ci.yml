@@ -1,0 +1,53 @@
+name: RivalScope CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  backend-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: uv sync --all-extras --dev
+
+      - name: Lint with Ruff
+        working-directory: ./backend
+        run: |
+          uv run ruff check app tests
+          uv run ruff format --check app tests
+
+      - name: Type check with Mypy
+        working-directory: ./backend
+        run: uv run mypy app
+
+      - name: Run Backend Tests
+        working-directory: ./backend
+        env:
+          MOCK_PROVIDERS: "true"
+          DATABASE_URL: "sqlite:///./test.db"
+          SECRET_KEY: "ci-secret-key-32-chars-long-minimum!!"
+          JWT_SECRET: "ci-jwt-secret-key-32-chars-long!!"
+        run: uv run pytest tests/ -v --cov=app --cov-report=term-missing
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: backend-quality
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Backend Image
+        run: docker build -t rivalscope-api:ci ./backend

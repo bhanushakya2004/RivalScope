@@ -1,0 +1,47 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+*.egg
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Environment files & secrets
+.env
+.env.local
+*.pem
+*.key
+
+# Database and cache
+*.db
+*.sqlite
+*.sqlite3
+postgres_data/
+redis_data/
+
+# Testing and quality tools
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node & Next.js
+node_modules/
+.next/
+out/
+.npm/
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

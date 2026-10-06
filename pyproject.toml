@@ -1,0 +1,9 @@
+[project]
+name = "rivalscope-workspace"
+version = "0.1.0"
+description = "RivalScope Multi-Agent Competitive Intelligence Platform"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv.workspace]
+members = ["backend"]

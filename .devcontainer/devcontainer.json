@@ -1,0 +1,16 @@
+{
+  "name": "RivalScope Dev Environment",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "api",
+  "workspaceFolder": "/workspace",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "matangover.mypy",
+        "tamasfe.even-better-toml"
+      ]
+    }
+  }
+}
