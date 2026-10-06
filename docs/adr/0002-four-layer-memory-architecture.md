@@ -1,4 +1,4 @@
-# ADR 0002: Four-Layer Memory Architecture and Unified MemoryManager Facade
+# ADR 0002: Four-Layer Memory Architecture and RivalMemory Facade
 
 ## Status
 Accepted
@@ -10,10 +10,10 @@ Competitive intelligence platforms require diverse memory temporalities:
 3. Long-term semantic knowledge (historical articles, regulatory filings, reports).
 4. Structured temporal facts (timeline of product launches, executive changes, funding rounds).
 
-Without clean separation, LLM contexts suffer from token bloat, hallucinations, and stale data.
+Without clean separation, LLM contexts suffer from token bloat, hallucinations, and stale data. Furthermore, using a facade named `MemoryManager` creates direct namespace clashes with Agno's internal `agno.memory.MemoryManager`.
 
 ## Decision
-We implement a **Four-Layer Memory Architecture** coordinated behind a single facade (`app.memory.manager.MemoryManager`):
+We implement a **Four-Layer Memory Architecture** coordinated behind a single unified facade named **`RivalMemory`** (`app.memory.manager.RivalMemory`):
 
 1. **Layer 1: Working / Session Memory**
    - Agno session management backed by PostgreSQL (`PostgresDb`).
@@ -27,21 +27,21 @@ We implement a **Four-Layer Memory Architecture** coordinated behind a single fa
 
 3. **Layer 3: Knowledge & Semantic Memory (Long-Term RAG)**
    - Backed by PostgreSQL `pgvector` via `agno.vectordb.pgvector.PgVector`.
-   - Hybrid search (`SearchType.hybrid` combining dense vector embeddings with PostgreSQL tsvector full-text search).
+   - **Hybrid Keyword + Vector Search**: Configured with `SearchType.hybrid`, combining dense vector embeddings with PostgreSQL tsvector full-text keyword search. Supports `SearchType.vector` and `SearchType.keyword`.
    - Stores chunked `raw_documents` and generated reports with metadata filters (`tenant_id`, `competitor_id`, `category`, `published_at`).
 
 4. **Layer 4: Entity & Event Timeline Memory**
    - Normalized relational tables in PostgreSQL (`signals`, `event_clusters`, `entity_timeline`).
-   - Supports structured queries: "What features did Stripe launch in Q3?", "Show pricing changes for Adyen over the past 6 months".
-   - Contradiction detection: compares newly extracted facts against existing records to flag updates, reversals, or false claims.
+   - Supports structured temporal queries: "What features did Stripe launch in Q3?", "Show pricing changes for Adyen over the past 6 months".
+   - Contradiction detection: compares newly extracted facts against existing timeline records to flag updates, reversals, or false claims.
 
 ## Facade Interface
-The `MemoryManager` facade exposes narrow, tenant-scoped methods to agents:
+The `RivalMemory` facade exposes narrow, tenant-scoped methods to agents and workflows:
 - `remember(tenant_id, text, category)`: Store durable org fact.
 - `recall(tenant_id, query)`: Retrieve relevant org context.
-- `search_knowledge(tenant_id, query, competitor_id, category, limit)`: Hybrid search over vector store.
-- `timeline_query(tenant_id, competitor_id, start_date, end_date)`: Relational timeline slice.
+- `search_knowledge(tenant_id, query, competitor_id=None, category=None, limit=10, search_type=SearchType.hybrid)`: Hybrid keyword + vector search over PgVector.
+- `timeline_query(tenant_id, competitor_id=None, start_date=None, end_date=None)`: Relational timeline slice.
 
 ## Consequences
-- **Positive**: Strict tenant isolation across all layers, optimal token economics, fast hybrid retrieval, and clear provenance for every insight.
+- **Positive**: Strict tenant isolation across all layers, optimal token economics, fast hybrid retrieval, zero naming conflicts with Agno internal classes, and clear provenance for every insight.
 - **Negative**: Requires maintaining both relational and vector indexes in PostgreSQL.
