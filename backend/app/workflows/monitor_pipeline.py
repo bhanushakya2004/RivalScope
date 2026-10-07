@@ -15,6 +15,7 @@ from app.agents.verifier_agent import create_verifier_agent
 from app.core.logging import get_logger
 from app.core.model_factory import resolve_model
 from app.dedup.pipeline import DeduplicationPipeline
+from app.guardrails.runner import default_guardrail_harness
 from app.ingestion.collector_runner import CollectorRunner
 from app.memory.manager import RivalMemory
 from app.providers.notify import MockNotifier
@@ -108,11 +109,15 @@ class MonitorPipelineWorkflow:
         if actionable_clusters:
             top_cluster = actionable_clusters[0]
 
-            # Evidence Verification
+            # Evidence Verification with ADR 0005 untrusted source quarantine
+            isolated_evidence = default_guardrail_harness.isolate_untrusted_document(
+                raw_text=f"Summary: {top_cluster.summary}\nCitations: {[c.url for c in top_cluster.citations]}",
+                source_id=getattr(top_cluster, "id", getattr(top_cluster, "cluster_id", "cluster-default")),
+                domain=domain,
+                title=top_cluster.title,
+            )
             verify_prompt = (
-                f"Verify the following event cluster: {top_cluster.title}\n"
-                f"Summary: {top_cluster.summary}\n"
-                f"Citations: {[c.url for c in top_cluster.citations]}"
+                f"Verify the following event cluster: {top_cluster.title}\n{isolated_evidence}"
             )
             verifier_out = self.verifier.run(verify_prompt)
             verified_count += 1
@@ -132,7 +137,14 @@ class MonitorPipelineWorkflow:
                 f"Impact: {analyst_out.content}"
             )
             reporter_out = self.reporter.run(reporter_prompt)
-            final_markdown_report = str(reporter_out.content)
+            raw_report = str(reporter_out.content)
+
+            # Output Guardrail Verification (leakage, financial slander, grounding)
+            guarded_report = default_guardrail_harness.guard_output(
+                text=raw_report,
+                known_entities=[comp_name, "PayPulse"],
+            )
+            final_markdown_report = guarded_report.sanitized_text
 
             # Step 5: Multi-Channel Delivery
             await self.notifier.send(

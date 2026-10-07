@@ -22,19 +22,21 @@ def test_resolve_model_with_google_api_key(monkeypatch):
     settings = Settings(
         mock_providers=False, google_api_key="test-google-ai-studio-key"
     )
-    model = resolve_model("gemini-2.0-flash", settings=settings)
+    model = resolve_model("gemini-3.8-flash", settings=settings)
     assert isinstance(model, Gemini)
-    assert model.id == "gemini-2.0-flash"
+    assert model.id == "gemini-3.8-flash"
     assert model.api_key == "test-google-ai-studio-key"
 
 
 def test_resolve_model_with_gemini_api_key(monkeypatch):
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
-    settings = Settings(mock_providers=False, gemini_api_key="test-gemini-key")
-    model = resolve_model("gemini-2.5-flash", settings=settings)
+    settings = Settings(
+        mock_providers=False, gemini_api_key="test-gemini-key", google_api_key=None
+    )
+    model = resolve_model("gemini-3.8-flash", settings=settings)
     assert isinstance(model, Gemini)
-    assert model.id == "gemini-2.5-flash"
+    assert model.id == "gemini-3.8-flash"
     assert model.api_key == "test-gemini-key"
 
 

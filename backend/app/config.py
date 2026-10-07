@@ -38,13 +38,13 @@ class Settings(BaseSettings):
     mock_providers: bool = True
 
     # --- LLM Models ---
-    llm_provider: str = "openai"
+    llm_provider: str = "gemini"
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
     gemini_api_key: str | None = None
     google_api_key: str | None = None
-    collector_model: str = "gemini:gemini-2.0-flash"
-    analyst_model: str = "gemini:gemini-2.0-flash"
+    collector_model: str = "gemini:gemini-3.8-flash"
+    analyst_model: str = "gemini:gemini-3.8-flash"
     embedding_model: str = "text-embedding-3-small"
 
     @property
@@ -94,3 +94,6 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Return cached application settings singleton."""
     return Settings()
+
+
+settings = get_settings()

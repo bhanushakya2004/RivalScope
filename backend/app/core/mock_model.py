@@ -137,7 +137,7 @@ class MockModel(Model):
 
         check_text = user_q or low_msg
 
-        # Greetings
+        # Greetings & pleasantries
         if check_text in [
             "hi",
             "hello",
@@ -151,6 +151,102 @@ class MockModel(Model):
                 "Hello! I am your RivalScope competitive intelligence assistant. "
                 "I am actively monitoring your fintech rivals, including Stripe, Adyen, and Revolut. "
                 "You can ask me about recent product moves, pricing shifts, executive hiring, or regulatory filings."
+            )
+
+        # Well-being and casual conversation
+        if any(
+            w in check_text
+            for w in [
+                "how are you",
+                "how're you",
+                "how r u",
+                "how do you do",
+                "how is it going",
+                "how's it going",
+                "how are things",
+                "how are you doing",
+                "what's up",
+                "whats up",
+            ]
+        ):
+            return (
+                "I am functioning smoothly! I am continuously monitoring your fintech rivals—including Stripe, "
+                "Adyen, and Revolut—and tracking market moves across product, pricing, talent, and filings. "
+                "What would you like to explore today?"
+            )
+
+        # Capabilities, features, and help
+        if any(
+            c in check_text
+            for c in [
+                "capabilit",
+                "what can you do",
+                "what do you do",
+                "how can you help",
+                "help",
+                "features",
+                "what are your tools",
+                "what do you know",
+                "instructions",
+            ]
+        ):
+            return (
+                "As your RivalScope competitive intelligence assistant, I can:\n\n"
+                "1. **Continuous Competitor Tracking**: Monitor news, changelogs, SEC filings, and careers pages for rivals like Stripe, Adyen, and Revolut.\n"
+                "2. **6-Stage Deduplication**: Filter duplicate reports and near-duplicate articles using SimHash and pgvector semantic clustering.\n"
+                "3. **Evidence Citations**: Ground every strategic move against verified PostgreSQL evidence with confidence scoring.\n"
+                "4. **Contradiction Detection**: Cross-reference Layer 4 historical timelines to flag strategic reversals (e.g. pricing fee changes, executive shifts).\n"
+                "5. **On-Demand Intelligence Briefs**: Synthesize cited markdown reports and trigger autonomous monitor pipeline cycles.\n\n"
+                "Try asking: 'Tell me about Adyen', 'What is Stripe's latest move?', or 'Compare Stripe and Adyen pricing'."
+            )
+
+        # Identity & platform overview
+        if any(
+            i in check_text
+            for i in [
+                "who are you",
+                "what is rivalscope",
+                "what is this",
+                "about you",
+                "about yourself",
+                "introduce yourself",
+            ]
+        ):
+            return (
+                "I am RivalScope, an open-source, self-hostable multi-agent competitive intelligence platform for fintech teams. "
+                "I orchestrate specialized collector, verifier, and analyst agents to deliver verifiable, evidence-backed strategic insights."
+            )
+
+        # Signals and recent updates
+        if any(
+            s in check_text
+            for s in [
+                "signal",
+                "latest move",
+                "recent move",
+                "what's new",
+                "whats new",
+                "recent updates",
+                "recent intelligence",
+            ]
+        ):
+            return (
+                "Latest Verified Competitive Signals:\n"
+                "1. [Pricing] Stripe launched usage-based pricing for embedded finance (Score: 94 impact).\n"
+                "2. [Product] Adyen expanded issuer processing across North America and India (Score: 88 impact).\n"
+                "3. [Financial] Block reported 21% gross profit growth driven by Cash App (Score: 81 impact).\n"
+                "4. [Talent] Plaid opened 34 platform engineering roles in enterprise identity (Score: 72 impact).\n"
+                "All signals are verified with citations stored in PostgreSQL."
+            )
+
+        # Stripe queries
+        if "stripe" in check_text and not ("adyen" in check_text and "revolut" in check_text):
+            return (
+                "Stripe Competitive Intelligence Summary:\n"
+                "- Signal: Stripe launched Agentic Commerce payment toolkits with instant settlement.\n"
+                "- Strategic Impact: Direct pressure on Adyen and legacy merchant acquirers.\n"
+                "- Evidence: Corroborated across 3 verified sources (Stripe Blog, PR Newswire, Hacker News).\n"
+                "- Recommended Action: Evaluate our API latency and merchant onboarding timeline."
             )
 
         # Adyen queries
@@ -189,7 +285,7 @@ class MockModel(Model):
             )
 
         # Pricing queries
-        if "pricing" in check_text:
+        if "pricing" in check_text or "fee" in check_text:
             return (
                 "Pricing Analysis Brief:\n"
                 "- Stripe Move: Introduced modular usage-based pricing for embedded finance, lowering barrier to entry for marketplace platforms.\n"
@@ -197,7 +293,25 @@ class MockModel(Model):
                 "- Impact: Competitive pressure on transaction take-rates for mid-market SaaS platforms."
             )
 
-        return self.default_response
+        # Dynamic fallback: Extract live database signals from the prompt if present
+        extracted_signals = []
+        for line in last_msg.splitlines():
+            if line.strip().startswith("- [") and ":" in line:
+                extracted_signals.append(line.strip())
+
+        if extracted_signals:
+            signals_summary = "\n".join(extracted_signals[:3])
+            return (
+                f"Here is the latest verified intelligence from our PostgreSQL database:\n\n"
+                f"{signals_summary}\n\n"
+                f"All signals have been verified across multiple sources and stored with pgvector citations. "
+                f"Ask me about any specific competitor or move to dig deeper!"
+            )
+
+        return (
+            "I am your RivalScope competitive intelligence assistant. I am actively tracking Stripe, Adyen, and Revolut.\n"
+            "You can ask me about recent product moves, pricing changes, executive hiring, or compare specific competitors."
+        )
 
     def invoke(self, *args: Any, **kwargs: Any) -> ModelResponse:
         content = self._resolve_content(**kwargs)

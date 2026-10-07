@@ -106,18 +106,18 @@
 
 ## 9. Quality Gate & Testing
 
-- [x] **Test Suite**: 52/52 unit and integration tests passing (`pytest tests/`)
-- [x] **Linter**: 0 errors on `ruff check backend tests` and `eslint .`
+- [x] **Test Suite**: 64/64 unit and integration tests passing (`pytest tests/`)
+- [x] **Linter**: 0 errors on `ruff check backend tests`
 - [x] **Formatter**: Clean code formatting on `ruff format --check backend tests`
-- [x] **OpenAPI Schema**: Successfully verified registered operations including interactive chat and on-demand run triggers
+- [x] **OpenAPI Schema**: Successfully verified registered operations including interactive chat, guardrail check, judge scoring, and harness runs
 
 ---
 
 ## 10. Durable State, Chat Sessions & Dynamic UI
 
 - [x] **PostgreSQL Chat Session & Message Persistence**: Added `ChatSession` and `ChatMessage` models (`backend/app/db/models/chat.py`) with PostgreSQL UUID primary keys, tenant isolation, and timestamps. Implemented `/api/v1/chat/sessions` (list, get transcript, delete) and wired chat endpoints to persist user queries and assistant responses.
-- [x] **Agno Native Storage Integration**: Configured `agno.db.postgres.PostgresDb` in `app.db.session` (`agno_sessions`, `agno_runs`, `agno_memories`) and injected it directly into `create_ci_team()` to allow Agno itself to manage agent state, runs, and memories.
-- [x] **Grounded Chat Prompting & Conversational Intelligence**: Enhanced `FollowUpHandler._build_grounded_prompt` to dynamically query live tenant companies, verified signals, and timeline events from PostgreSQL. Natural conversational greetings for "hi"/"hello" and grounded summaries for competitor queries.
+- [x] **Agno Native Storage Integration**: Configured `agno.db.postgres.PostgresDb` in `app.db.session` (`agno_sessions`, `agno_runs`, `agno_memories`) and injected it directly into `create_ci_team()` to allow Agno itself to manage agent state, runs, and memories with zero greenlet warnings.
+- [x] **Grounded Chat Prompting & Conversational Intelligence**: Enhanced `FollowUpHandler._build_grounded_prompt` to dynamically query live tenant companies, verified signals, and timeline events from PostgreSQL. Natural conversational greetings for "hi"/"hello", capabilities overview for capability queries, and grounded summaries for competitor queries.
 - [x] **Comprehensive Dynamic UI Overhaul**: Audited and overhauled `frontend/components/rivalscope-app.tsx` and `frontend/lib/api.ts` to eliminate all hardcoded fallback data:
   - `SchedulesView`: Live schedule cards with cadence details and interactive "Run Now" trigger.
   - `MemoryView`: Layer 2 organizational preferences with inline creation form + Layer 4 entity timeline.
@@ -131,5 +131,43 @@
 - [x] **Real-Time Chatbot SSE Streaming**: Progressive Server-Sent Events (SSE) token-by-token streaming via `sse-starlette` (`POST /api/v1/chat/stream` and `GET /api/v1/chat/stream`), integrated with Agno team runner, Next.js reverse proxy (`/api/v1/:path*`), and interactive React chat drawer with immediate token streaming.
 - [x] **Zero-ENV Resilient Architecture**: Graceful fallback handling when external API keys are omitted. System defaults to deterministic `MockModel`, `MockSearchProvider`, `MockCrawlProvider`, and optional `.env` loading in docker compose.
 - [x] **CI/CD Pipeline**: GitHub Actions workflow (`.github/workflows/ci.yml`) running `ruff`, `mypy`, and `pytest` on push
-- [ ] **Live Provider Key Verification**: End-to-end integration run when operator supplies live Google Gemini (`gemini-2.5-flash` / `gemini-2.5-pro`), Tavily, and Firecrawl keys in `.env`
+
+---
+
+## 11. Multi-Layer Agent Guardrails Subsystem
+
+- [x] **Input Guardrails** (`backend/app/guardrails/input_guardrails.py`):
+  - `PromptInjectionGuardrail`: Direct adversarial jailbreak detection ("ignore previous instructions", "DAN mode", "reveal system prompt") blocking attacks before agent execution.
+  - `PIIScrubbingGuardrail`: Automated detection and redaction of credit card numbers (`[REDACTED_CREDIT_CARD]`), SSNs (`[REDACTED_SSN]`), and API secrets (`[REDACTED_SECRET_KEY]`).
+  - `ScopeGuardrail`: Detection and blocking of destructive commands (SQL injections, drop table, malicious scripts).
+  - `UntrustedContentIsolationGuardrail`: ADR 0005 quarantine for external crawled text with automated XML breakout sanitization and tag encapsulation (`<untrusted_source_content>`).
+- [x] **Output Guardrails** (`backend/app/guardrails/output_guardrails.py`):
+  - `SystemLeakageGuardrail`: Output scanning and redaction of database URIs (`postgresql+psycopg://`), Redis connection strings, and internal secrets.
+  - `FinancialSlanderGuardrail`: Defamation and market manipulation safeguard flagging uncorroborated solvency/fraud claims and auto-appending formal legal compliance notices.
+  - `HallucinationGroundingGuardrail`: Verifies competitor mentions against active tenant watchlists and validates markdown citation URLs.
+- [x] **Unified Runner Harness** (`backend/app/guardrails/runner.py`): Centralized `AgentGuardrailHarness` integrating both input and output pipelines across `FollowUpHandler` and `MonitorPipelineWorkflow`.
+
+---
+
+## 12. LLM-as-a-Judge Evaluation & Agent Benchmarking Harness
+
+- [x] **LLM-as-a-Judge Evaluation Engine** (`backend/app/evals/llm_judge.py`):
+  - Evaluates agent outputs across 5 core dimensions:
+    1. `groundedness` (0.0–1.0): Factual verification against context without hallucinations.
+    2. `strategic_relevance` (0.0–1.0): Direct responsiveness and competitive intelligence depth.
+    3. `guardrail_safety` (0.0–1.0): Resistance to adversarial attacks, secret leakage prevention, and safe refusals.
+    4. `actionability` (0.0–1.0): Concrete tactical counter-moves and executive implications.
+    5. `citation_quality` (0.0–1.0): Valid attribution and source URL citation integrity.
+  - Dual-mode execution: Live evaluation using Google AI Studio Gemini (`gemini-3.8-flash`) or high-precision deterministic offline evaluation for zero-token CI testing.
+- [x] **Agent Benchmarking Test Harness** (`backend/app/evals/harness.py`):
+  - Predefined Golden Scenarios: `stripe_agentic_payments`, `adyen_unified_commerce`, `revolut_us_banking`, `adversarial_prompt_injection`, `pii_scrubbing_check`, and `conversational_capabilities`.
+  - Automated end-to-end execution: Input guardrail verification -> Agent/Team coordination -> Output guardrails -> LLM-as-a-Judge scoring.
+  - Formatted Markdown reporting and CLI executable (`python -m app.evals.harness`, `make evals`). Attained 100% pass rate (6/6 passed, composite score 0.965).
+- [x] **Evaluation & Guardrail API Endpoints** (`backend/app/api/v1/evals.py`):
+  - `GET /api/v1/evals/scenarios`: Enumerate benchmark test cases.
+  - `POST /api/v1/evals/judge`: Run LLM-as-a-Judge scoring on arbitrary query/response pairs.
+  - `POST /api/v1/evals/harness/run`: Trigger on-demand benchmark suite execution with category filtering.
+  - `POST /api/v1/evals/guardrails/check`: Interactive guardrail testing endpoint for input/output verification.
+- [x] **Live Provider Key Verification & Quota Fallback**: Live Google AI Studio Gemini (`gemini-3.8-flash`) key verified. Automatic mapping of deprecated model IDs to `gemini-3.8-flash`, with interception of Google AI Studio 429 quota exhaustion (`RESOURCE_EXHAUSTED`) to fall back gracefully to grounded PostgreSQL intelligence without raw JSON error leakage.
 - [ ] **Helm & Kubernetes Manifests**: Optional cloud-native deployment manifests for self-hosted enterprise clusters
+

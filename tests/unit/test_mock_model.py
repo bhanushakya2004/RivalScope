@@ -37,3 +37,28 @@ def test_mock_model_custom_responses():
     agent = Agent(model=model)
     res = agent.run("What happened with Revolut?")
     assert "Revolut applied for UK banking license" in res.content
+
+
+def test_mock_model_conversational_queries():
+    model = MockModel(id="test-conversational")
+    agent = Agent(model=model)
+
+    # 1. Well-being
+    how_res = agent.run("how are you?")
+    assert "functioning smoothly" in how_res.content
+
+    # 2. Capabilities
+    cap_res = agent.run("tell me your capabilities")
+    assert (
+        "Continuous Competitor Tracking" in cap_res.content
+        or "capabilities" in cap_res.content.lower()
+    )
+
+    # 3. Adyen specific
+    adyen_res = agent.run("tell me about Adyen")
+    assert "Adyen" in adyen_res.content
+    assert "Unified Commerce" in adyen_res.content
+
+    # 4. Identity
+    who_res = agent.run("who are you?")
+    assert "RivalScope" in who_res.content

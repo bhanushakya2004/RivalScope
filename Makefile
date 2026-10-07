@@ -9,6 +9,7 @@ help:
 	@echo "  make down        - Stop all Docker services"
 	@echo "  make build       - Build docker images"
 	@echo "  make demo        - Run full offline demo pipeline (seeds data, runs agents, generates report)"
+	@echo "  make evals       - Run agent benchmark harness with LLM-as-a-judge & guardrails"
 	@echo "  make migrate     - Run database migrations via Alembic"
 	@echo "  make seed        - Seed database with fintech competitor data"
 	@echo "  make test        - Run backend test suite"
@@ -33,6 +34,9 @@ seed:
 
 demo:
 	cd backend && $(PYTHON) -m app.scripts.demo_runner
+
+evals:
+	cd backend && $(PYTHON) -m app.evals.harness
 
 test:
 	cd backend && $(UV) run pytest tests/ -v
