@@ -92,7 +92,7 @@ export type ApiTimelineEvent = {
   category: string;
   title: string;
   event_date: string;
-  details?: string;
+  details?: string | Record<string, unknown> | null;
 };
 
 export type ApiChatSession = {

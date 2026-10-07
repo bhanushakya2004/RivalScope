@@ -1106,6 +1106,23 @@ function Mcp({
   );
 }
 
+function formatDetails(details: unknown): string {
+  if (!details) return "";
+  if (typeof details === "string") return details;
+  if (typeof details === "object") {
+    const d = details as Record<string, unknown>;
+    if (d.summary && typeof d.summary === "string") return d.summary;
+    if (d.corroboration_count !== undefined) {
+      return `Corroborated across ${d.corroboration_count} source${Number(d.corroboration_count) === 1 ? "" : "s"}`;
+    }
+    const entries = Object.entries(d)
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`)
+      .join(" • ");
+    return entries || JSON.stringify(d);
+  }
+  return String(details);
+}
+
 function MemoryView({
   preferences,
   timeline,
@@ -1191,7 +1208,11 @@ function MemoryView({
                 <span className="rounded bg-indigo-50 px-2 py-0.5 font-bold text-indigo-700">
                   {p.category}
                 </span>
-                <p className="mt-1.5 text-slate-700">{p.text || p.memory_text}</p>
+                <p className="mt-1.5 text-slate-700">
+                  {typeof (p.text || p.memory_text) === "object"
+                    ? JSON.stringify(p.text || p.memory_text)
+                    : String(p.text || p.memory_text || "")}
+                </p>
               </div>
             ))
           )}
@@ -1235,7 +1256,9 @@ function MemoryView({
                     {new Date(evt.event_date).toLocaleDateString()}
                   </span>
                 </div>
-                {evt.details && <p className="mt-1 text-slate-500">{evt.details}</p>}
+                {Boolean(formatDetails(evt.details)) && (
+                  <p className="mt-1 text-slate-500">{formatDetails(evt.details)}</p>
+                )}
               </div>
             ))
           )}
@@ -1948,7 +1971,7 @@ export function RivalScopeApp({ section }: { section: string }) {
                     : "mr-8 bg-slate-100 text-slate-800"
                 }`}
               >
-                {msg.text}
+                {typeof msg.text === "object" ? JSON.stringify(msg.text) : String(msg.text)}
               </div>
             ))}
             {chatLoading && (!chatMessages.length || chatMessages[chatMessages.length - 1].role === "user") && (
@@ -2005,20 +2028,23 @@ export function RivalScopeApp({ section }: { section: string }) {
             <p className="mt-6 leading-7 text-slate-600">{selectedSignal.summary}</p>
             <div className="mt-8">
               <p className="eyebrow">Evidence & Citations</p>
-              {selectedSignal.sources.map((source, i) => (
-                <div
-                  className="mt-3 flex items-center justify-between rounded-xl border p-3"
-                  key={source}
-                >
-                  <div>
-                    <p className="font-semibold text-xs text-slate-800">{source}</p>
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Corroborating ground-truth evidence #{i + 1}
-                    </p>
+              {selectedSignal.sources.map((source, i) => {
+                const sourceText = typeof source === "object" ? JSON.stringify(source) : String(source);
+                return (
+                  <div
+                    className="mt-3 flex items-center justify-between rounded-xl border p-3"
+                    key={`${sourceText}-${i}`}
+                  >
+                    <div>
+                      <p className="font-semibold text-xs text-slate-800">{sourceText}</p>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        Corroborating ground-truth evidence #{i + 1}
+                      </p>
+                    </div>
+                    <ExternalLink className="h-4 w-4 text-indigo-600" />
                   </div>
-                  <ExternalLink className="h-4 w-4 text-indigo-600" />
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="mt-8 rounded-xl bg-emerald-50 p-4">
               <p className="font-semibold text-emerald-800 text-sm">Strategic Context</p>
