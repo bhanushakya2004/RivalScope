@@ -114,3 +114,35 @@ def test_runs_endpoints(client):
     resp = client.get("/api/v1/runs")
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
+
+    # Test on-demand run trigger
+    trigger_resp = client.post("/api/v1/runs/trigger", json={})
+    assert trigger_resp.status_code == 201
+    run_data = trigger_resp.json()
+    assert run_data["status"] == "completed"
+    assert run_data["company_name"] != ""
+
+
+def test_chat_endpoint(client):
+    resp = client.post(
+        "/api/v1/chat",
+        json={
+            "question": "What is Stripe's current pricing strategy?",
+            "competitor_name": "Stripe",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "answer" in data
+    assert len(data["answer"]) > 0
+
+
+def test_reports_harmonized_fields(client):
+    resp = client.get("/api/v1/reports")
+    assert resp.status_code == 200
+    reports = resp.json()
+    if len(reports) > 0:
+        first = reports[0]
+        assert "content" in first
+        assert "status" in first
+        assert "report_type" in first

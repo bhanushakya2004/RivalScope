@@ -40,7 +40,8 @@ services:
     ports:
       - "7777:7777"
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/rivalscope
       ASYNC_DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/rivalscope
@@ -66,7 +67,8 @@ services:
     restart: unless-stopped
     command: ["python", "-m", "app.worker"]
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/rivalscope
       ASYNC_DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/rivalscope
@@ -89,6 +91,7 @@ services:
       - "3000:3000"
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:7777
+      BACKEND_INTERNAL_URL: http://api:7777
     depends_on:
       api:
         condition: service_started

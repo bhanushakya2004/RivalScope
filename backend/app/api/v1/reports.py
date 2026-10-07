@@ -30,6 +30,11 @@ class ReportResponse(BaseModel):
     scope: dict[str, Any]
     markdown: str
     created_at: str
+    report_type: str = "comprehensive"
+    company_id: str | None = None
+    summary: str = ""
+    content: str = ""
+    status: str = "completed"
 
 
 @router.get("", response_model=list[ReportResponse])
@@ -54,6 +59,13 @@ def list_reports(
             scope=r.scope or {},
             markdown=r.markdown,
             created_at=r.created_at.isoformat(),
+            report_type=r.period,
+            company_id=(r.scope or {}).get("company_id"),
+            summary=(r.structured_json or {}).get(
+                "summary", r.markdown[:280] if r.markdown else ""
+            ),
+            content=r.markdown or "",
+            status="completed",
         )
         for r in reports
     ]
@@ -113,6 +125,13 @@ def generate_report(
         scope=rep.scope or {},
         markdown=rep.markdown,
         created_at=rep.created_at.isoformat(),
+        report_type=rep.period,
+        company_id=(rep.scope or {}).get("company_id"),
+        summary=(rep.structured_json or {}).get(
+            "summary", rep.markdown[:280] if rep.markdown else ""
+        ),
+        content=rep.markdown or "",
+        status="completed",
     )
 
 
@@ -134,4 +153,11 @@ def get_report(
         scope=rep.scope or {},
         markdown=rep.markdown,
         created_at=rep.created_at.isoformat(),
+        report_type=rep.period,
+        company_id=(rep.scope or {}).get("company_id"),
+        summary=(rep.structured_json or {}).get(
+            "summary", rep.markdown[:280] if rep.markdown else ""
+        ),
+        content=rep.markdown or "",
+        status="completed",
     )

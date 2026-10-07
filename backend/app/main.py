@@ -46,6 +46,18 @@ def resolve_model(settings: Settings) -> Model:
             return Claude(id="claude-3-5-sonnet", api_key=settings.anthropic_api_key)
         except Exception as e:
             logger.warning(f"Failed to load Claude: {e}. Falling back to MockModel.")
+    elif settings.llm_provider == "gemini" and settings.gemini_api_key:
+        try:
+            from agno.models.google.gemini import Gemini
+
+            model_id = (
+                settings.collector_model.replace("gemini:", "")
+                if ":" in settings.collector_model
+                else "gemini-2.0-flash"
+            )
+            return Gemini(id=model_id, api_key=settings.gemini_api_key)
+        except Exception as e:
+            logger.warning(f"Failed to load Gemini: {e}. Falling back to MockModel.")
 
     return MockModel(id="mock-fallback-model")
 

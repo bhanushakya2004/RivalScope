@@ -106,18 +106,19 @@
 
 ## 9. Quality Gate & Testing
 
-- [x] **Test Suite**: 42/42 unit and integration tests passing (`pytest tests/`)
+- [x] **Test Suite**: 44/44 unit and integration tests passing (`pytest tests/`)
 - [x] **Linter**: 0 errors on `ruff check backend tests`
 - [x] **Formatter**: Clean code formatting on `ruff format --check backend tests`
-- [x] **OpenAPI Schema**: Successfully verified 95 registered operations
+- [x] **OpenAPI Schema**: Successfully verified registered operations including interactive chat and on-demand run triggers
 
 ---
 
 ## 10. Remaining Tasks & Production Readiness
 
-- [x] **Docker Image Build**: Completed backend Docker image packaging for `api` and `worker` services (`docker compose build api`)
-- [ ] **Alembic Migration History**: Generate automated migration revision script (`alembic revision --autogenerate`)
-- [ ] **Frontend Contract Verification**: Coordinate with Codex frontend team to verify Next.js UI integration with `/api/v1`
+- [x] **Docker Multi-Container Packaging**: Both frontend (`rivalmoves-web`) and backend (`rivalmoves-api`, `rivalmoves-worker`) Docker containers built and validated. Full stack running healthy (`postgres`, `redis`, `api`, `worker`, `web`).
+- [x] **Alembic Migration History**: Initial automated schema migration revision generated and stamped to head (`backend/alembic/versions/a0a73ffafa80_initial_schema.py`) with native pgvector extension support.
+- [x] **Frontend Contract & Reverse Proxy Verification**: Next.js UI integration aligned with `/api/v1` REST contract. Interactive grounded research chat drawer, on-demand monitor run triggers, competitor registration, and container network proxy verified.
+- [x] **Zero-ENV Resilient Architecture**: Graceful fallback handling when external API keys are omitted. System defaults to deterministic `MockModel`, `MockSearchProvider`, `MockCrawlProvider`, and optional `.env` loading in docker compose.
 - [ ] **Live Provider Key Verification**: End-to-end integration test with real Google Gemini (`gemini-2.5-pro`), Tavily, and Firecrawl keys
 - [ ] **CI/CD Pipeline**: GitHub Actions workflow (`.github/workflows/ci.yml`) running `ruff`, `mypy`, and `pytest` on push
 - [ ] **Helm & Kubernetes Manifests**: Optional cloud-native deployment manifests for self-hosted enterprise clusters
