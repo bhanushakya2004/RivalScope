@@ -77,6 +77,33 @@ export type ApiChatMessage = {
   tenant_id: string;
 };
 
+export type ApiPreference = {
+  id: string;
+  category: string;
+  text?: string;
+  memory_text?: string;
+  confidence?: number;
+  updated_at?: string;
+};
+
+export type ApiTimelineEvent = {
+  id: string;
+  company_id?: string;
+  category: string;
+  title: string;
+  event_date: string;
+  details?: string;
+};
+
+export type ApiChatSession = {
+  id: string;
+  title: string;
+  competitor_name?: string;
+  created_at: string;
+  updated_at: string;
+  messages_count: number;
+};
+
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:7777";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -125,25 +152,54 @@ export const rivalScopeApi = {
       body: JSON.stringify({ action, comment }),
     }),
   mcpServers: () => request<ApiMcpServer[]>("/mcp-servers"),
+  addMcpServer: (payload: {
+    name: string;
+    transport?: string;
+    url?: string;
+    auth_type?: string;
+    allowed_tools?: string[];
+  }) =>
+    request<ApiMcpServer>("/mcp-servers", {
+      method: "POST",
+      body: JSON.stringify({
+        transport: "streamable-http",
+        auth_type: "bearer",
+        allowed_tools: ["search_knowledge_base", "get_competitor_timeline", "get_company_signals"],
+        ...payload,
+      }),
+    }),
   updateMcpPolicy: (serverId: string, toolName: string, isEnabled: boolean, requireApproval: boolean) =>
     request(`/mcp-servers/${serverId}/policies`, {
       method: "PATCH",
       body: JSON.stringify({ tool_name: toolName, is_enabled: isEnabled, require_approval: requireApproval }),
     }),
-  preferences: () => request<{ id: string; category: string; memory_text: string }[]>("/memory/preferences"),
+  preferences: () => request<ApiPreference[]>("/memory/preferences"),
+  addPreference: (category: string, memoryText: string) =>
+    request<ApiPreference>("/memory/preferences", {
+      method: "POST",
+      body: JSON.stringify({ category, memory_text: memoryText }),
+    }),
   timeline: (companyId?: string) =>
-    request<Array<{ id: string; event_type: string; summary: string; timestamp: string }>>(
+    request<ApiTimelineEvent[]>(
       `/memory/timeline${companyId ? `?company_id=${companyId}` : ""}`
     ),
-  chat: (question: string, competitorName?: string) =>
-    request<ApiChatMessage>("/chat", {
+  chatSessions: () =>
+    request<ApiChatSession[]>("/chat/sessions"),
+  chatSessionMessages: (sessionId: string) =>
+    request<Array<{ id: string; role: string; content: string; created_at: string }>>(
+      `/chat/sessions/${sessionId}/messages`
+    ),
+  chat: (question: string, competitorName?: string, sessionId?: string) =>
+    request<ApiChatMessage & { session_id?: string }>("/chat", {
       method: "POST",
-      body: JSON.stringify({ question, competitor_name: competitorName }),
+      body: JSON.stringify({ question, competitor_name: competitorName, session_id: sessionId }),
     }),
   chatStream: async function* (
     question: string,
     competitorName?: string,
-    onStatus?: (status: string) => void
+    sessionId?: string,
+    onStatus?: (status: string) => void,
+    onSession?: (sessionId: string) => void
   ): AsyncGenerator<string, void, unknown> {
     const token = typeof window === "undefined" ? null : localStorage.getItem("rivalscope_access_token");
     const response = await fetch(`${apiBaseUrl}/api/v1/chat/stream`, {
@@ -153,7 +209,7 @@ export const rivalScopeApi = {
         Accept: "text/event-stream",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ question, competitor_name: competitorName }),
+      body: JSON.stringify({ question, competitor_name: competitorName, session_id: sessionId }),
     });
 
     if (!response.ok || !response.body) {
@@ -182,6 +238,9 @@ export const rivalScopeApi = {
           const dataStr = trimmed.replace("data:", "").trim();
           try {
             const parsed = JSON.parse(dataStr);
+            if (parsed.session_id && onSession) {
+              onSession(parsed.session_id);
+            }
             if (currentEvent === "delta" && parsed.token) {
               yield parsed.token;
             } else if (parsed.token) {

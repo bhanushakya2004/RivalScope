@@ -165,6 +165,47 @@ def test_chat_stream_get_endpoint(client):
     assert "event: done" in text or "done" in text
 
 
+def test_chat_sessions_endpoints(client):
+    # 1. Send question, creates session
+    chat_resp = client.post(
+        "/api/v1/chat",
+        json={
+            "question": "Tell me about Revolut's banking status",
+            "competitor_name": "Revolut",
+        },
+    )
+    assert chat_resp.status_code == 200
+    data = chat_resp.json()
+    assert "session_id" in data
+    session_id = data["session_id"]
+
+    # 2. List sessions
+    sessions_resp = client.get("/api/v1/chat/sessions")
+    assert sessions_resp.status_code == 200
+    sessions = sessions_resp.json()
+    assert any(s["id"] == session_id for s in sessions)
+
+    # 3. Get session messages
+    msgs_resp = client.get(f"/api/v1/chat/sessions/{session_id}/messages")
+    assert msgs_resp.status_code == 200
+    messages = msgs_resp.json()
+    assert len(messages) >= 2
+    assert messages[0]["role"] == "user"
+    assert messages[1]["role"] == "assistant"
+
+    # 4. Continuation with same session
+    followup_resp = client.post(
+        "/api/v1/chat",
+        json={
+            "question": "What about their pricing?",
+            "session_id": session_id,
+            "competitor_name": "Revolut",
+        },
+    )
+    assert followup_resp.status_code == 200
+    assert followup_resp.json()["session_id"] == session_id
+
+
 def test_reports_harmonized_fields(client):
     resp = client.get("/api/v1/reports")
     assert resp.status_code == 200

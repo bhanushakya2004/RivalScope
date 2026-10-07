@@ -17,12 +17,17 @@ def create_ci_team(
     model: Model | None = None,
     memory: RivalMemory | None = None,
     tools: list[Any] | Callable[[Any], list[Any]] | None = None,
+    db: Any | None = None,
 ) -> Team:
     """
     Construct the Coordinated CI Team using Agno TeamMode.coordinate.
-    The leader orchestrates specialized agents and accesses RivalMemory.
+    The leader orchestrates specialized agents, accesses RivalMemory,
+    and records sessions/runs in Agno's native PostgresDb storage.
     """
+    from app.db.session import get_agno_db
+
     model = model or resolve_model()
+    agno_db = db or get_agno_db()
     verifier = create_verifier_agent(model)
     analyst = create_analyst_agent(model)
     reporter = create_reporter_agent(model)
@@ -61,6 +66,7 @@ def create_ci_team(
         model=model,
         members=[verifier, analyst, reporter],
         tools=team_tools,
+        db=agno_db,
         description="Coordinates verification, fintech strategic impact analysis, and executive synthesis.",
         instructions=[
             "You are the Director of Competitive Intelligence leading a team of specialized agents.",

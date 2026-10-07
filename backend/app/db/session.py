@@ -45,3 +45,34 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def get_agno_db():
+    """Return Agno's native storage DB instance for sessions, runs, and memories."""
+    settings = get_settings()
+    url = settings.database_url
+    try:
+        if "postgres" in url:
+            from agno.db.postgres import PostgresDb
+
+            return PostgresDb(
+                db_engine=engine,
+                db_url=url,
+                session_table="agno_sessions",
+                runs_table="agno_runs",
+                memory_table="agno_memories",
+                create_schema=True,
+            )
+        elif "sqlite" in url:
+            from agno.db.sqlite import SqliteDb
+
+            return SqliteDb(
+                db_engine=engine,
+                session_table="agno_sessions",
+                create_schema=True,
+            )
+    except Exception as exc:
+        import logging
+
+        logging.getLogger("db.session").warning(f"Could not initialize Agno native DB: {exc}")
+    return None

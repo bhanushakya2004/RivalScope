@@ -18,7 +18,7 @@ from app.config import Settings, get_settings
 from app.core.errors import RivalScopeError, rivalscope_exception_handler
 from app.core.logging import get_logger, setup_logging
 from app.core.telemetry import HTTP_REQUESTS_TOTAL, init_telemetry
-from app.db.session import engine
+from app.db.session import Base, engine
 
 logger = get_logger("rivalscope.main")
 
@@ -90,6 +90,13 @@ def create_application() -> FastAPI:
     settings = get_settings()
     setup_logging(level="DEBUG" if settings.debug else "INFO")
     logger.info(f"Starting {settings.app_name} v{settings.app_version} in {settings.env} mode")
+
+    try:
+        import app.db.models  # noqa: F401
+
+        Base.metadata.create_all(bind=engine)
+    except Exception as exc:
+        logger.warning(f"Database schema initialization: {exc}")
 
     base_app = FastAPI(
         title=settings.app_name,

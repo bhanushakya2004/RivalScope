@@ -117,12 +117,85 @@ class MockModel(Model):
             mock_dict = _generate_mock_instance_dict(response_format)
             return json.dumps(mock_dict)
 
-        # 2. Check for matching custom responses
+        # 2. Check for explicit custom responses
+        last_msg = ""
         if messages:
             last_msg = str(messages[-1].content or "")
             for query_fragment, custom_resp in self.custom_responses.items():
                 if query_fragment.lower() in last_msg.lower():
                     return custom_resp
+
+        # 3. Dynamic conversational detection from messages
+        low_msg = last_msg.lower()
+
+        # Check for user question line if embedded in structured prompt
+        user_q = ""
+        for line in last_msg.splitlines():
+            if line.strip().lower().startswith("user question:"):
+                user_q = line.split(":", 1)[1].strip().lower()
+                break
+
+        check_text = user_q or low_msg
+
+        # Greetings
+        if check_text in [
+            "hi",
+            "hello",
+            "hey",
+            "greetings",
+            "good morning",
+            "good afternoon",
+            "good evening",
+        ] or any(check_text.startswith(g) for g in ["hi ", "hello ", "hey "]):
+            return (
+                "Hello! I am your RivalScope competitive intelligence assistant. "
+                "I am actively monitoring your fintech rivals, including Stripe, Adyen, and Revolut. "
+                "You can ask me about recent product moves, pricing shifts, executive hiring, or regulatory filings."
+            )
+
+        # Adyen queries
+        if "adyen" in check_text and not ("stripe" in check_text and "revolut" in check_text):
+            return (
+                "Adyen Competitive Intelligence Summary:\n"
+                "- Unified Commerce: Adyen expanded its in-person POS issuer processing across North America and India with local rails.\n"
+                "- Strategic Focus: Driving 32% volume growth in enterprise omnichannel retail and digital platform acquiring.\n"
+                "- Evidence: Corroborated via Adyen press disclosures and regulatory filings in PostgreSQL storage.\n"
+                "- Recommended Action: Assess PayPulse's localized acquiring settlement speed against Adyen's unified ledger."
+            )
+
+        # Revolut queries
+        if "revolut" in check_text and not ("stripe" in check_text and "adyen" in check_text):
+            return (
+                "Revolut Competitive Intelligence Summary:\n"
+                "- Banking & Licensing: Revolut secured progress on its UK banking license mobilization and expanded global business accounts.\n"
+                "- Product Velocity: Rolled out automated treasury management and merchant acquiring tools for SME customers.\n"
+                "- Evidence: Sourced from public changelogs, Reuters disclosures, and financial statements.\n"
+                "- Recommended Action: Benchmark PayPulse's multi-currency exchange spreads against Revolut Business."
+            )
+
+        # Competitors overview
+        if (
+            "competitor" in check_text
+            or "watchlist" in check_text
+            or "rivals" in check_text
+            or "who" in check_text
+        ):
+            return (
+                "Monitored Competitors Overview:\n"
+                "1. Stripe (stripe.com) — Leading developer infrastructure; recently rolled out agentic commerce toolkits and usage-based embedded finance billing.\n"
+                "2. Adyen (adyen.com) — Enterprise unified commerce leader; expanding global acquiring rails and localized card issuing.\n"
+                "3. Revolut (revolut.com) — High-velocity global neobank; scaling enterprise multi-currency payouts and treasury features.\n"
+                "All intelligence is deduplicated across 6 stages and backed by citations in PostgreSQL."
+            )
+
+        # Pricing queries
+        if "pricing" in check_text:
+            return (
+                "Pricing Analysis Brief:\n"
+                "- Stripe Move: Introduced modular usage-based pricing for embedded finance, lowering barrier to entry for marketplace platforms.\n"
+                "- Adyen Response: Bundling acquiring fees with risk management tools to preserve net take-rate among Tier-1 merchants.\n"
+                "- Impact: Competitive pressure on transaction take-rates for mid-market SaaS platforms."
+            )
 
         return self.default_response
 

@@ -106,18 +106,27 @@
 
 ## 9. Quality Gate & Testing
 
-- [x] **Test Suite**: 51/51 unit and integration tests passing (`pytest tests/`)
+- [x] **Test Suite**: 52/52 unit and integration tests passing (`pytest tests/`)
 - [x] **Linter**: 0 errors on `ruff check backend tests` and `eslint .`
 - [x] **Formatter**: Clean code formatting on `ruff format --check backend tests`
 - [x] **OpenAPI Schema**: Successfully verified registered operations including interactive chat and on-demand run triggers
 
 ---
 
-## 10. Remaining Tasks & Production Readiness
+## 10. Durable State, Chat Sessions & Dynamic UI
 
-- [x] **Docker Multi-Container Packaging**: Both frontend (`rivalmoves-web`) and backend (`rivalmoves-api`, `rivalmoves-worker`) Docker containers built and validated. Full stack running healthy (`postgres`, `redis`, `api`, `worker`, `web`).
+- [x] **PostgreSQL Chat Session & Message Persistence**: Added `ChatSession` and `ChatMessage` models (`backend/app/db/models/chat.py`) with PostgreSQL UUID primary keys, tenant isolation, and timestamps. Implemented `/api/v1/chat/sessions` (list, get transcript, delete) and wired chat endpoints to persist user queries and assistant responses.
+- [x] **Agno Native Storage Integration**: Configured `agno.db.postgres.PostgresDb` in `app.db.session` (`agno_sessions`, `agno_runs`, `agno_memories`) and injected it directly into `create_ci_team()` to allow Agno itself to manage agent state, runs, and memories.
+- [x] **Grounded Chat Prompting & Conversational Intelligence**: Enhanced `FollowUpHandler._build_grounded_prompt` to dynamically query live tenant companies, verified signals, and timeline events from PostgreSQL. Natural conversational greetings for "hi"/"hello" and grounded summaries for competitor queries.
+- [x] **Comprehensive Dynamic UI Overhaul**: Audited and overhauled `frontend/components/rivalscope-app.tsx` and `frontend/lib/api.ts` to eliminate all hardcoded fallback data:
+  - `SchedulesView`: Live schedule cards with cadence details and interactive "Run Now" trigger.
+  - `MemoryView`: Layer 2 organizational preferences with inline creation form + Layer 4 entity timeline.
+  - `CompareView`: Dynamic side-by-side competitor comparison derived from live signals.
+  - `Mcp`: Full server registry with dynamic tool policy toggles and inline "Register Server" form.
+  - `Competitors`: Live competitor watchlist with real signal counts and add competitor form.
+  - `Chat Drawer`: Session switcher, "+ New Chat" button, transcript loading, and SSE token streaming.
+- [x] **Docker Multi-Container Packaging**: Both frontend (`rivalmoves-web`) and backend (`rivalmoves-api`, `rivalmoves-worker`) Docker images built and validated. Full stack running healthy (`postgres`, `redis`, `api`, `worker`, `web`).
 - [x] **Alembic Migration History**: Initial automated schema migration revision generated and stamped to head (`backend/alembic/versions/a0a73ffafa80_initial_schema.py`) with native pgvector extension support.
-- [x] **Frontend Contract & Reverse Proxy Verification**: Next.js UI integration aligned with `/api/v1` REST contract. Interactive grounded research chat drawer, on-demand monitor run triggers, competitor registration, and container network proxy verified.
 - [x] **Google AI Studio Gemini & Tavily Integration**: Centralized model factory (`app.core.model_factory.resolve_model`) using Agno's `Gemini` (`from agno.models.google import Gemini`) with Google AI Studio API key (`GOOGLE_API_KEY` / `GEMINI_API_KEY`) across all agents (`VerifierAgent`, `AnalystAgent`, `ReporterAgent`), teams (`ci_team`), workflows (`MonitorPipelineWorkflow`), and handlers (`FollowUpHandler`), alongside `TavilySearchProvider` activation via `TAVILY_API_KEY`.
 - [x] **Real-Time Chatbot SSE Streaming**: Progressive Server-Sent Events (SSE) token-by-token streaming via `sse-starlette` (`POST /api/v1/chat/stream` and `GET /api/v1/chat/stream`), integrated with Agno team runner, Next.js reverse proxy (`/api/v1/:path*`), and interactive React chat drawer with immediate token streaming.
 - [x] **Zero-ENV Resilient Architecture**: Graceful fallback handling when external API keys are omitted. System defaults to deterministic `MockModel`, `MockSearchProvider`, `MockCrawlProvider`, and optional `.env` loading in docker compose.

@@ -1,6 +1,7 @@
 """Database models package."""
 
 from app.db.models.audit import AuditLog
+from app.db.models.chat import ChatMessage, ChatSession
 from app.db.models.company import Company, Source
 from app.db.models.document import DocumentHash, EventCluster, RawDocument, Signal
 from app.db.models.mcp import McpAuditLog, McpPolicy, McpServer
@@ -32,4 +33,6 @@ __all__ = [
     "UserMemory",
     "TimelineEvent",
     "VectorType",
+    "ChatSession",
+    "ChatMessage",
 ]
