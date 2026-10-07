@@ -9,11 +9,12 @@ from agno.team import Team, TeamMode
 from app.agents.analyst_agent import create_analyst_agent
 from app.agents.reporter_agent import create_reporter_agent
 from app.agents.verifier_agent import create_verifier_agent
+from app.core.model_factory import resolve_model
 from app.memory.manager import RivalMemory
 
 
 def create_ci_team(
-    model: Model,
+    model: Model | None = None,
     memory: RivalMemory | None = None,
     tools: list[Any] | Callable[[Any], list[Any]] | None = None,
 ) -> Team:
@@ -21,6 +22,7 @@ def create_ci_team(
     Construct the Coordinated CI Team using Agno TeamMode.coordinate.
     The leader orchestrates specialized agents and accesses RivalMemory.
     """
+    model = model or resolve_model()
     verifier = create_verifier_agent(model)
     analyst = create_analyst_agent(model)
     reporter = create_reporter_agent(model)

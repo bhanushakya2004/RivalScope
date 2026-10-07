@@ -1,10 +1,14 @@
 """Interactive Follow-up Q&A Handler for Slack and Telegram interactions."""
 
+import asyncio
+import json
+from collections.abc import AsyncIterator
 from typing import Any
 
 from agno.models.base import Model
 
 from app.core.logging import get_logger
+from app.core.model_factory import resolve_model
 from app.memory.manager import RivalMemory
 from app.teams.ci_team import create_ci_team
 
@@ -14,10 +18,10 @@ logger = get_logger("delivery.followup")
 class FollowUpHandler:
     """Handles conversational follow-up questions from executives in chat surfaces."""
 
-    def __init__(self, model: Model, memory: RivalMemory | None = None):
-        self.model = model
+    def __init__(self, model: Model | None = None, memory: RivalMemory | None = None):
+        self.model = model or resolve_model()
         self.memory = memory or RivalMemory()
-        self.team = create_ci_team(model=model, memory=self.memory)
+        self.team = create_ci_team(model=self.model, memory=self.memory)
 
     async def handle_query(
         self,
@@ -47,4 +51,72 @@ class FollowUpHandler:
             "answer": str(res.content),
             "tenant_id": tenant_id,
             "competitor": competitor_name,
+        }
+
+    async def stream_query(
+        self,
+        tenant_id: str,
+        user_id: str,
+        question: str,
+        competitor_name: str | None = None,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Stream conversational follow-up response tokens via Server-Sent Events (SSE)."""
+        logger.info(f"Streaming follow-up question for {tenant_id}: '{question}'")
+
+        # Query relevant memory context
+        recalled_prefs = self.memory.recall(tenant_id=tenant_id, limit=3)
+        pref_context = (
+            "\n".join([f"- {p['text']}" for p in recalled_prefs]) if recalled_prefs else ""
+        )
+
+        full_prompt = (
+            f"Tenant Organization Context:\n{pref_context}\n\n"
+            f"User Question: {question}\n"
+            f"Target Competitor: {competitor_name or 'General Fintech Rivals'}\n"
+            "Coordinate team members to answer accurately with evidence citations."
+        )
+
+        # Emit initial start event
+        yield {
+            "event": "start",
+            "data": json.dumps(
+                {
+                    "status": "started",
+                    "competitor": competitor_name,
+                    "tenant_id": tenant_id,
+                }
+            ),
+        }
+
+        full_answer: list[str] = []
+        try:
+            generator = self.team.run(full_prompt, stream=True)
+            for chunk in generator:
+                token = chunk if isinstance(chunk, str) else getattr(chunk, "content", None)
+                if token is not None and str(token) != "":
+                    text = str(token)
+                    full_answer.append(text)
+                    yield {
+                        "event": "delta",
+                        "data": json.dumps({"token": text}),
+                    }
+                    await asyncio.sleep(0.005)
+        except Exception as exc:
+            logger.error(f"Error during stream generation: {exc}", exc_info=True)
+            yield {
+                "event": "error",
+                "data": json.dumps({"error": str(exc)}),
+            }
+            return
+
+        yield {
+            "event": "done",
+            "data": json.dumps(
+                {
+                    "status": "completed",
+                    "full_answer": "".join(full_answer),
+                    "competitor": competitor_name,
+                    "tenant_id": tenant_id,
+                }
+            ),
         }

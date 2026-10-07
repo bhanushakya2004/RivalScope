@@ -17,7 +17,6 @@ from app.api.v1 import api_v1_router
 from app.config import Settings, get_settings
 from app.core.errors import RivalScopeError, rivalscope_exception_handler
 from app.core.logging import get_logger, setup_logging
-from app.core.mock_model import MockModel
 from app.core.telemetry import HTTP_REQUESTS_TOTAL, init_telemetry
 from app.db.session import engine
 
@@ -26,40 +25,9 @@ logger = get_logger("rivalscope.main")
 
 def resolve_model(settings: Settings) -> Model:
     """Return appropriate model based on configuration."""
-    if settings.mock_providers:
-        return MockModel(id="mock-default-model")
+    from app.core.model_factory import resolve_model as factory_resolve_model
 
-    # If live keys are present, import provider model dynamically
-    if settings.llm_provider == "openai" and settings.openai_api_key:
-        try:
-            from agno.models.openai import OpenAIChat
-
-            return OpenAIChat(
-                id=settings.collector_model.replace("openai:", ""), api_key=settings.openai_api_key
-            )
-        except Exception as e:
-            logger.warning(f"Failed to load OpenAIChat: {e}. Falling back to MockModel.")
-    elif settings.llm_provider == "anthropic" and settings.anthropic_api_key:
-        try:
-            from agno.models.anthropic import Claude
-
-            return Claude(id="claude-3-5-sonnet", api_key=settings.anthropic_api_key)
-        except Exception as e:
-            logger.warning(f"Failed to load Claude: {e}. Falling back to MockModel.")
-    elif settings.llm_provider == "gemini" and settings.gemini_api_key:
-        try:
-            from agno.models.google.gemini import Gemini
-
-            model_id = (
-                settings.collector_model.replace("gemini:", "")
-                if ":" in settings.collector_model
-                else "gemini-2.0-flash"
-            )
-            return Gemini(id=model_id, api_key=settings.gemini_api_key)
-        except Exception as e:
-            logger.warning(f"Failed to load Gemini: {e}. Falling back to MockModel.")
-
-    return MockModel(id="mock-fallback-model")
+    return factory_resolve_model(settings=settings)
 
 
 def create_collector_agents(model: Model) -> list[Agent]:

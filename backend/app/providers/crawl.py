@@ -62,8 +62,10 @@ class FirecrawlProvider(BaseCrawlProvider):
     """Live webpage scraper using Firecrawl API."""
 
     def __init__(self, api_key: str | None = None):
+        import os
+
         settings = get_settings()
-        self.api_key = api_key or settings.firecrawl_api_key
+        self.api_key = api_key or settings.firecrawl_api_key or os.getenv("FIRECRAWL_API_KEY")
 
     async def crawl_url(self, url: str) -> IngestedItem | None:
         if not self.api_key:

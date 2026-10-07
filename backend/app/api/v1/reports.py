@@ -8,7 +8,7 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_and_tenant
-from app.core.mock_model import MockModel
+from app.core.model_factory import resolve_model
 from app.db.models import Company, Report
 from app.db.session import get_db
 from app.memory.manager import RivalMemory
@@ -93,7 +93,7 @@ def generate_report(
             comp_name = target_company.name
 
     # Synthesize intelligence via CI team
-    model = MockModel(id="report-gen-model")
+    model = resolve_model("report-gen-model")
     memory = RivalMemory(db=db)
     team = create_ci_team(model=model, memory=memory)
 

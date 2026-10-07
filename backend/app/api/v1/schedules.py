@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_and_tenant
-from app.core.mock_model import MockModel
+from app.core.model_factory import resolve_model
 from app.db.models import Schedule
 from app.db.session import get_db
 from app.scheduler.scheduler import SchedulerEngine
@@ -105,7 +105,7 @@ async def trigger_schedule_now(
     if not sched:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schedule not found")
 
-    model = MockModel(id="sched-runner")
+    model = resolve_model("sched-runner")
     engine = SchedulerEngine(model=model)
     res = await engine.execute_schedule(schedule_id)
     return res

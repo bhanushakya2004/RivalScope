@@ -42,9 +42,14 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
     gemini_api_key: str | None = None
-    collector_model: str = "openai:gpt-4o-mini"
-    analyst_model: str = "openai:gpt-4o"
+    google_api_key: str | None = None
+    collector_model: str = "gemini:gemini-2.0-flash"
+    analyst_model: str = "gemini:gemini-2.0-flash"
     embedding_model: str = "text-embedding-3-small"
+
+    @property
+    def effective_gemini_api_key(self) -> str | None:
+        return self.google_api_key or self.gemini_api_key
 
     # --- External Search & Crawl ---
     tavily_api_key: str | None = None

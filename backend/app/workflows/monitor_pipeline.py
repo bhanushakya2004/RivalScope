@@ -13,6 +13,7 @@ from app.agents.analyst_agent import create_analyst_agent
 from app.agents.reporter_agent import create_reporter_agent
 from app.agents.verifier_agent import create_verifier_agent
 from app.core.logging import get_logger
+from app.core.model_factory import resolve_model
 from app.dedup.pipeline import DeduplicationPipeline
 from app.ingestion.collector_runner import CollectorRunner
 from app.memory.manager import RivalMemory
@@ -48,14 +49,14 @@ class PipelineExecutionSummary(BaseModel):
 class MonitorPipelineWorkflow:
     """Orchestrates ingestion, 6-stage dedup, verification, analysis, and reporting."""
 
-    def __init__(self, model: Model, memory: RivalMemory | None = None):
-        self.model = model
+    def __init__(self, model: Model | None = None, memory: RivalMemory | None = None):
+        self.model = model or resolve_model()
         self.memory = memory or RivalMemory()
         self.collector_runner = CollectorRunner()
         self.dedup_pipeline = DeduplicationPipeline()
-        self.verifier = create_verifier_agent(model)
-        self.analyst = create_analyst_agent(model)
-        self.reporter = create_reporter_agent(model)
+        self.verifier = create_verifier_agent(self.model)
+        self.analyst = create_analyst_agent(self.model)
+        self.reporter = create_reporter_agent(self.model)
         self.notifier = MockNotifier()
 
     async def execute(self, run_input: PipelineRunInput) -> PipelineExecutionSummary:

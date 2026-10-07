@@ -4,10 +4,12 @@ from agno.agent import Agent
 from agno.models.base import Model
 
 from app.agents.schemas import VerifiedSignal
+from app.core.model_factory import resolve_model
 
 
-def create_verifier_agent(model: Model) -> Agent:
+def create_verifier_agent(model: Model | None = None) -> Agent:
     """Create Verifier Agent that ensures zero hallucination and ground truth citations."""
+    model = model or resolve_model()
     return Agent(
         name="VerifierAgent",
         model=model,

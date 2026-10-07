@@ -62,7 +62,7 @@
 - [x] **Team Coordination**: Agno `Team` with `TeamMode.coordinate` and `RivalMemory` tool injection ([backend/app/teams/ci_team.py](file:///C:/Users/bhanu/Desktop/Projects/RivalMoves/backend/app/teams/ci_team.py))
 - [x] **Autonomous Workflow**: `MonitorPipelineWorkflow` orchestrating ingestion, dedup, verification, analysis, report synthesis, timeline updates, and notification ([backend/app/workflows/monitor_pipeline.py](file:///C:/Users/bhanu/Desktop/Projects/RivalMoves/backend/app/workflows/monitor_pipeline.py))
 - [x] **Delivery Dispatcher**: Multi-channel dispatching with channel idempotency ([backend/app/delivery/dispatcher.py](file:///C:/Users/bhanu/Desktop/Projects/RivalMoves/backend/app/delivery/dispatcher.py))
-- [x] **Interactive Q&A Followup**: Natural language conversational handler answering follow-up queries with citation memory ([backend/app/delivery/followup.py](file:///C:/Users/bhanu/Desktop/Projects/RivalMoves/backend/app/delivery/followup.py))
+- [x] **Interactive Q&A Followup & Chatbot SSE**: Natural language conversational handler answering follow-up queries with citation memory and real-time Server-Sent Events (SSE) streaming ([backend/app/delivery/followup.py](file:///C:/Users/bhanu/Desktop/Projects/RivalMoves/backend/app/delivery/followup.py), [backend/app/api/v1/chat.py](file:///C:/Users/bhanu/Desktop/Projects/RivalMoves/backend/app/api/v1/chat.py))
 
 ---
 
@@ -106,8 +106,8 @@
 
 ## 9. Quality Gate & Testing
 
-- [x] **Test Suite**: 44/44 unit and integration tests passing (`pytest tests/`)
-- [x] **Linter**: 0 errors on `ruff check backend tests`
+- [x] **Test Suite**: 51/51 unit and integration tests passing (`pytest tests/`)
+- [x] **Linter**: 0 errors on `ruff check backend tests` and `eslint .`
 - [x] **Formatter**: Clean code formatting on `ruff format --check backend tests`
 - [x] **OpenAPI Schema**: Successfully verified registered operations including interactive chat and on-demand run triggers
 
@@ -118,7 +118,9 @@
 - [x] **Docker Multi-Container Packaging**: Both frontend (`rivalmoves-web`) and backend (`rivalmoves-api`, `rivalmoves-worker`) Docker containers built and validated. Full stack running healthy (`postgres`, `redis`, `api`, `worker`, `web`).
 - [x] **Alembic Migration History**: Initial automated schema migration revision generated and stamped to head (`backend/alembic/versions/a0a73ffafa80_initial_schema.py`) with native pgvector extension support.
 - [x] **Frontend Contract & Reverse Proxy Verification**: Next.js UI integration aligned with `/api/v1` REST contract. Interactive grounded research chat drawer, on-demand monitor run triggers, competitor registration, and container network proxy verified.
+- [x] **Google AI Studio Gemini & Tavily Integration**: Centralized model factory (`app.core.model_factory.resolve_model`) using Agno's `Gemini` (`from agno.models.google import Gemini`) with Google AI Studio API key (`GOOGLE_API_KEY` / `GEMINI_API_KEY`) across all agents (`VerifierAgent`, `AnalystAgent`, `ReporterAgent`), teams (`ci_team`), workflows (`MonitorPipelineWorkflow`), and handlers (`FollowUpHandler`), alongside `TavilySearchProvider` activation via `TAVILY_API_KEY`.
+- [x] **Real-Time Chatbot SSE Streaming**: Progressive Server-Sent Events (SSE) token-by-token streaming via `sse-starlette` (`POST /api/v1/chat/stream` and `GET /api/v1/chat/stream`), integrated with Agno team runner, Next.js reverse proxy (`/api/v1/:path*`), and interactive React chat drawer with immediate token streaming.
 - [x] **Zero-ENV Resilient Architecture**: Graceful fallback handling when external API keys are omitted. System defaults to deterministic `MockModel`, `MockSearchProvider`, `MockCrawlProvider`, and optional `.env` loading in docker compose.
-- [ ] **Live Provider Key Verification**: End-to-end integration test with real Google Gemini (`gemini-2.5-pro`), Tavily, and Firecrawl keys
-- [ ] **CI/CD Pipeline**: GitHub Actions workflow (`.github/workflows/ci.yml`) running `ruff`, `mypy`, and `pytest` on push
+- [x] **CI/CD Pipeline**: GitHub Actions workflow (`.github/workflows/ci.yml`) running `ruff`, `mypy`, and `pytest` on push
+- [ ] **Live Provider Key Verification**: End-to-end integration run when operator supplies live Google Gemini (`gemini-2.5-flash` / `gemini-2.5-pro`), Tavily, and Firecrawl keys in `.env`
 - [ ] **Helm & Kubernetes Manifests**: Optional cloud-native deployment manifests for self-hosted enterprise clusters

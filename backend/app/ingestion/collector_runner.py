@@ -37,22 +37,39 @@ class CollectorRunner:
         filings_provider: BaseFilingsProvider | None = None,
         social_provider: BaseSocialProvider | None = None,
     ):
-        settings = get_settings()
+        import os
 
-        if settings.mock_providers:
-            self.search = search_provider or MockSearchProvider()
-            self.crawl = crawl_provider or MockCrawlProvider()
-            self.filings = filings_provider or MockFilingsProvider()
-            self.social = social_provider or MockSocialProvider()
+        settings = get_settings()
+        tavily_key = settings.tavily_api_key or os.getenv("TAVILY_API_KEY")
+        firecrawl_key = settings.firecrawl_api_key or os.getenv("FIRECRAWL_API_KEY")
+
+        if search_provider:
+            self.search = search_provider
+        elif tavily_key:
+            self.search = TavilySearchProvider(api_key=tavily_key)
         else:
-            self.search = search_provider or (
-                TavilySearchProvider() if settings.tavily_api_key else MockSearchProvider()
-            )
-            self.crawl = crawl_provider or (
-                FirecrawlProvider() if settings.firecrawl_api_key else MockCrawlProvider()
-            )
-            self.filings = filings_provider or SecEdgarFilingsProvider()
-            self.social = social_provider or RssSocialProvider()
+            self.search = MockSearchProvider()
+
+        if crawl_provider:
+            self.crawl = crawl_provider
+        elif firecrawl_key:
+            self.crawl = FirecrawlProvider(api_key=firecrawl_key)
+        else:
+            self.crawl = MockCrawlProvider()
+
+        if filings_provider:
+            self.filings = filings_provider
+        elif not settings.mock_providers:
+            self.filings = SecEdgarFilingsProvider()
+        else:
+            self.filings = MockFilingsProvider()
+
+        if social_provider:
+            self.social = social_provider
+        elif not settings.mock_providers:
+            self.social = RssSocialProvider()
+        else:
+            self.social = MockSocialProvider()
 
     async def run_for_competitor(
         self,

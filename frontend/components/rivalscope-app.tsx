@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity, Bell, Bot, CalendarClock, Check, ChevronRight, CircleHelp,
   Cloud, Database, ExternalLink, FileText, Gauge, Layers3, LineChart,
@@ -756,7 +756,7 @@ export function RivalScopeApp({ section }: { section: string }) {
   const resolvedSection = pageTitles[section] ? section : "dashboard";
   const [title, subtitle] = pageTitles[resolvedSection];
 
-  const refreshData = () => {
+  const refreshData = useCallback(() => {
     Promise.all([
       rivalScopeApi.companies(),
       rivalScopeApi.signals(),
@@ -790,13 +790,13 @@ export function RivalScopeApp({ section }: { section: string }) {
       .catch(() => {
         setApiStatus("demo");
       });
-  };
+  }, []);
 
   useEffect(() => {
     refreshData();
-  }, []);
+  }, [refreshData]);
 
-  const handleTriggerRun = async () => {
+  const handleTriggerRun = useCallback(async () => {
     setPipelineRunning(true);
     try {
       await rivalScopeApi.triggerRun();
@@ -806,9 +806,9 @@ export function RivalScopeApp({ section }: { section: string }) {
     } finally {
       setPipelineRunning(false);
     }
-  };
+  }, [refreshData]);
 
-  const handleGenerateReport = async (reportPrompt: string) => {
+  const handleGenerateReport = useCallback(async (reportPrompt: string) => {
     setReportGenerating(true);
     try {
       const rep = await rivalScopeApi.generateReport(reportPrompt);
@@ -818,9 +818,9 @@ export function RivalScopeApp({ section }: { section: string }) {
     } finally {
       setReportGenerating(false);
     }
-  };
+  }, []);
 
-  const handleAddCompany = async (name: string, domain: string, tag: string) => {
+  const handleAddCompany = useCallback(async (name: string, domain: string, tag: string) => {
     try {
       const added = await rivalScopeApi.addCompany({
         name,
@@ -832,20 +832,23 @@ export function RivalScopeApp({ section }: { section: string }) {
     } catch {
       // Fallback
     }
-  };
+  }, []);
 
-  const handleTogglePolicy = async (
-    serverId: string,
-    toolName: string,
-    enabled: boolean,
-    approval: boolean
-  ) => {
-    try {
-      await rivalScopeApi.updateMcpPolicy(serverId, toolName, enabled, approval);
-    } catch {
-      // Fallback
-    }
-  };
+  const handleTogglePolicy = useCallback(
+    async (
+      serverId: string,
+      toolName: string,
+      enabled: boolean,
+      approval: boolean
+    ) => {
+      try {
+        await rivalScopeApi.updateMcpPolicy(serverId, toolName, enabled, approval);
+      } catch {
+        // Fallback
+      }
+    },
+    []
+  );
 
   const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -853,26 +856,54 @@ export function RivalScopeApp({ section }: { section: string }) {
     if (!query || chatLoading) return;
 
     const userMsg: ChatMessage = { id: String(Date.now()), role: "user", text: query };
+    const assistantId = String(Date.now() + 1);
     setChatMessages((cur) => [...cur, userMsg]);
     setChatQuery("");
     setChatLoading(true);
 
+    let streamActive = false;
+    let accumulatedText = "";
+
     try {
-      const res = await rivalScopeApi.chat(query);
-      const assistantMsg: ChatMessage = {
-        id: String(Date.now() + 1),
-        role: "assistant",
-        text: res.answer,
-        competitor: res.competitor ?? undefined,
-      };
-      setChatMessages((cur) => [...cur, assistantMsg]);
+      for await (const token of rivalScopeApi.chatStream(query)) {
+        if (!streamActive) {
+          streamActive = true;
+          accumulatedText = token;
+          setChatMessages((cur) => [
+            ...cur,
+            { id: assistantId, role: "assistant", text: token },
+          ]);
+        } else {
+          accumulatedText += token;
+          setChatMessages((cur) =>
+            cur.map((msg) =>
+              msg.id === assistantId ? { ...msg, text: msg.text + token } : msg
+            )
+          );
+        }
+      }
+
+      if (!streamActive) {
+        const res = await rivalScopeApi.chat(query);
+        setChatMessages((cur) => [
+          ...cur,
+          {
+            id: assistantId,
+            role: "assistant",
+            text: res.answer,
+            competitor: res.competitor ?? undefined,
+          },
+        ]);
+      }
     } catch {
-      const fallbackMsg: ChatMessage = {
-        id: String(Date.now() + 1),
-        role: "assistant",
-        text: "Based on stored intelligence, Stripe recently rolled out usage-based pricing for embedded finance, while Adyen expanded issuer processing with localized rails. Verified citations are linked in the Evidence drawer.",
-      };
-      setChatMessages((cur) => [...cur, fallbackMsg]);
+      if (!streamActive) {
+        const fallbackMsg: ChatMessage = {
+          id: assistantId,
+          role: "assistant",
+          text: "Based on stored intelligence, Stripe recently rolled out usage-based pricing for embedded finance, while Adyen expanded issuer processing with localized rails. Verified citations are linked in the Evidence drawer.",
+        };
+        setChatMessages((cur) => [...cur, fallbackMsg]);
+      }
     } finally {
       setChatLoading(false);
     }
@@ -924,6 +955,10 @@ export function RivalScopeApp({ section }: { section: string }) {
     return <Generic section={resolvedSection} />;
   }, [
     companies,
+    handleAddCompany,
+    handleGenerateReport,
+    handleTogglePolicy,
+    handleTriggerRun,
     liveSignals,
     mcpServers,
     pipelineRunning,
@@ -1066,7 +1101,7 @@ export function RivalScopeApp({ section }: { section: string }) {
                 {msg.text}
               </div>
             ))}
-            {chatLoading && (
+            {chatLoading && (!chatMessages.length || chatMessages[chatMessages.length - 1].role === "user") && (
               <div className="mr-8 flex items-center gap-2 rounded-xl bg-slate-100 p-3 text-xs text-slate-500">
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" />
                 Consulting Verifier & Analyst agents...

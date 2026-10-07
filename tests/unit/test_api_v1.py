@@ -137,6 +137,34 @@ def test_chat_endpoint(client):
     assert len(data["answer"]) > 0
 
 
+def test_chat_stream_post_endpoint(client):
+    resp = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "question": "What is Stripe's current pricing strategy?",
+            "competitor_name": "Stripe",
+        },
+    )
+    assert resp.status_code == 200
+    assert "text/event-stream" in resp.headers.get("content-type", "")
+    text = resp.text
+    assert "event: start" in text or "start" in text
+    assert "event: delta" in text or "delta" in text
+    assert "event: done" in text or "done" in text
+
+
+def test_chat_stream_get_endpoint(client):
+    resp = client.get(
+        "/api/v1/chat/stream?question=What+is+Adyen+doing&competitor_name=Adyen"
+    )
+    assert resp.status_code == 200
+    assert "text/event-stream" in resp.headers.get("content-type", "")
+    text = resp.text
+    assert "event: start" in text or "start" in text
+    assert "event: delta" in text or "delta" in text
+    assert "event: done" in text or "done" in text
+
+
 def test_reports_harmonized_fields(client):
     resp = client.get("/api/v1/reports")
     assert resp.status_code == 200

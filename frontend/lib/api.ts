@@ -140,4 +140,61 @@ export const rivalScopeApi = {
       method: "POST",
       body: JSON.stringify({ question, competitor_name: competitorName }),
     }),
+  chatStream: async function* (
+    question: string,
+    competitorName?: string,
+    onStatus?: (status: string) => void
+  ): AsyncGenerator<string, void, unknown> {
+    const token = typeof window === "undefined" ? null : localStorage.getItem("rivalscope_access_token");
+    const response = await fetch(`${apiBaseUrl}/api/v1/chat/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ question, competitor_name: competitorName }),
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error(`Chat stream failed (${response.status})`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      let currentEvent = "message";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        if (trimmed.startsWith("event:")) {
+          currentEvent = trimmed.replace("event:", "").trim();
+        } else if (trimmed.startsWith("data:")) {
+          const dataStr = trimmed.replace("data:", "").trim();
+          try {
+            const parsed = JSON.parse(dataStr);
+            if (currentEvent === "delta" && parsed.token) {
+              yield parsed.token;
+            } else if (parsed.token) {
+              yield parsed.token;
+            } else if (parsed.status && onStatus) {
+              onStatus(parsed.status);
+            }
+          } catch {
+            if (dataStr) yield dataStr;
+          }
+        }
+      }
+    }
+  },
 };
+

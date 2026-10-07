@@ -7,7 +7,7 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_and_tenant
-from app.core.mock_model import MockModel
+from app.core.model_factory import resolve_model
 from app.db.models import Company, Run
 from app.db.session import get_db
 from app.memory.manager import RivalMemory
@@ -151,7 +151,7 @@ async def trigger_run(
 
     start_time = time.time()
     try:
-        model = MockModel(id="pipeline-runner")
+        model = resolve_model("pipeline-runner")
         memory = RivalMemory(db=db)
         wf = MonitorPipelineWorkflow(model=model, memory=memory)
         pipe_input = PipelineRunInput(

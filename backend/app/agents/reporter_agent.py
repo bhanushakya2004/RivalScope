@@ -4,10 +4,12 @@ from agno.agent import Agent
 from agno.models.base import Model
 
 from app.agents.schemas import FormattedReport
+from app.core.model_factory import resolve_model
 
 
-def create_reporter_agent(model: Model) -> Agent:
+def create_reporter_agent(model: Model | None = None) -> Agent:
     """Create Reporter Agent formatting intelligence for diverse delivery channels."""
+    model = model or resolve_model()
     return Agent(
         name="ReporterAgent",
         model=model,

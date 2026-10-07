@@ -6,7 +6,7 @@ import sys
 
 from app.config import get_settings
 from app.core.logging import get_logger, setup_logging
-from app.core.mock_model import MockModel
+from app.core.model_factory import resolve_model
 from app.memory.manager import RivalMemory
 from app.scheduler.scheduler import SchedulerEngine
 
@@ -18,7 +18,7 @@ async def main():
     setup_logging(level="DEBUG" if settings.debug else "INFO")
     logger.info(f"Starting RivalScope background worker ({settings.env} mode)")
 
-    model = MockModel(id="worker-default-model")
+    model = resolve_model("worker-default-model")
     memory = RivalMemory()
     scheduler = SchedulerEngine(model=model, memory=memory)
 
