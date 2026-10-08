@@ -28,6 +28,8 @@ dependencies = [
     "python-multipart>=0.0.9",
     "google-genai>=0.1.0",
     "tavily-python>=0.3.0",
+    "openpyxl>=3.1.5",
+    "python-docx>=1.2.0",
 ]
 
 [project.optional-dependencies]

@@ -75,3 +75,24 @@ async def get_current_user_and_tenant(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Authorization header required",
     )
+
+
+def require_role(allowed_roles: list[str]):
+    """Enforce RBAC role requirements on protected endpoints."""
+
+    def _role_checker(
+        user_and_tenant: tuple[User, str] = Depends(get_current_user_and_tenant),
+    ) -> tuple[User, str]:
+        user, tenant_id = user_and_tenant
+        if user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. Required roles: {allowed_roles}, your role: '{user.role}'",
+            )
+        return user, tenant_id
+
+    return _role_checker
+
+
+require_admin = require_role(["admin"])
+require_analyst_or_admin = require_role(["admin", "analyst"])

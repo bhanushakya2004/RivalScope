@@ -24,6 +24,8 @@ venv/
 *.sqlite3
 postgres_data/
 redis_data/
+data/
+backend/data/
 
 # Testing and quality tools
 .pytest_cache/

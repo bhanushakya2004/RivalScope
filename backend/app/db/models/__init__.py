@@ -4,6 +4,7 @@ from app.db.models.audit import AuditLog
 from app.db.models.chat import ChatMessage, ChatSession
 from app.db.models.company import Company, Source
 from app.db.models.document import DocumentHash, EventCluster, RawDocument, Signal
+from app.db.models.internal_doc import InternalDocument
 from app.db.models.mcp import McpAuditLog, McpPolicy, McpServer
 from app.db.models.memory import TimelineEvent, UserMemory
 from app.db.models.report import Report
@@ -18,6 +19,7 @@ __all__ = [
     "Company",
     "Source",
     "RawDocument",
+    "InternalDocument",
     "Signal",
     "EventCluster",
     "DocumentHash",

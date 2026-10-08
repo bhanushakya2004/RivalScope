@@ -105,3 +105,29 @@ class McpPolicyEngine:
                 return True
 
         return False
+
+    def is_agent_allowed(
+        self,
+        tenant_id: str,
+        server_id: str,
+        tool_name: str,
+        agent_name: str,
+    ) -> bool:
+        """Check if tool is authorized for specific agent system."""
+        if self.db is None:
+            return True
+        policy = (
+            self.db.query(McpPolicy)
+            .filter(
+                McpPolicy.tenant_id == tenant_id,
+                McpPolicy.server_id == server_id,
+                McpPolicy.tool_name == tool_name,
+            )
+            .first()
+        )
+        if policy is None or not policy.is_enabled:
+            return False
+        scope = getattr(policy, "agent_scope", "all") or "all"
+        if scope in ["all", agent_name, "*"]:
+            return True
+        return False

@@ -32,6 +32,9 @@ class McpServer(Base):
     allowed_tools: Mapped[list[str]] = mapped_column(
         JSON, default=list
     )  # Explicitly allowlisted tool names
+    discovered_tools: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON, default=list
+    )  # Cached tool catalog from MCP discovery
     status: Mapped[str] = mapped_column(
         String(50), default="healthy"
     )  # healthy, unhealthy, disabled
@@ -53,8 +56,12 @@ class McpPolicy(Base):
         String(36), ForeignKey("mcp_servers.id", ondelete="CASCADE"), index=True, nullable=False
     )
     tool_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=False)  # Uber style: disabled by default
     require_approval: Mapped[bool] = mapped_column(Boolean, default=False)  # Human-in-the-loop gate
+    agent_scope: Mapped[str] = mapped_column(
+        String(50), default="all"
+    )  # all, internal_research, analyst
     rate_limit_per_min: Mapped[int] = mapped_column(Integer, default=60)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow

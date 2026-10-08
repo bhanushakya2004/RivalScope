@@ -47,6 +47,57 @@ export type ApiSchedule = {
   last_run_at?: string | null;
 };
 
+export type ApiUser = {
+  id: string;
+  email: string;
+  name?: string;
+  role: "admin" | "analyst" | "viewer" | string;
+  is_active: boolean;
+  tenant_id: string;
+  created_at: string;
+};
+
+export type ApiInternalDoc = {
+  id: string;
+  filename: string;
+  file_type: string;
+  file_size_bytes: number;
+  row_count: number;
+  column_names: string[];
+  summary: string;
+  status: string;
+  created_at: string;
+  metadata_json?: Record<string, unknown>;
+};
+
+export type ApiMcpCatalogItem = {
+  server_id: string;
+  server_name: string;
+  transport: string;
+  url?: string | null;
+  status: string;
+  tools: Array<{
+    name: string;
+    description: string;
+    is_enabled: boolean;
+    require_approval: boolean;
+    agent_scope: string;
+  }>;
+};
+
+export type ApiMcpAuditLog = {
+  id: string;
+  server_id: string;
+  tool_name: string;
+  user_id?: string | null;
+  arguments_json: Record<string, unknown>;
+  result_summary?: string | null;
+  duration_ms: number;
+  status: string;
+  error?: string | null;
+  created_at: string;
+};
+
 export type ApiMcpServer = {
   id: string;
   name: string;
@@ -58,6 +109,7 @@ export type ApiMcpServer = {
   policies: { tool_name: string; is_enabled: boolean; require_approval: boolean }[];
   created_at: string;
 };
+
 
 export type ApiRun = {
   id: string;
@@ -152,6 +204,16 @@ export const rivalScopeApi = {
       body: JSON.stringify({ action, comment }),
     }),
   mcpServers: () => request<ApiMcpServer[]>("/mcp-servers"),
+  mcpCatalog: () => request<ApiMcpCatalogItem[]>("/mcp-servers/catalog"),
+  discoverMcpTools: (serverId: string) =>
+    request<{ server_id: string; server_name: string; discovered_tools: unknown[]; count: number }>(
+      `/mcp-servers/${serverId}/discover`,
+      { method: "POST" }
+    ),
+  mcpAuditLogs: () =>
+    request<{ total: number; logs: ApiMcpAuditLog[] }>("/mcp-servers/audit-logs"),
+  deleteMcpServer: (serverId: string) =>
+    request<unknown>(`/mcp-servers/${serverId}`, { method: "DELETE" }),
   addMcpServer: (payload: {
     name: string;
     transport?: string;
@@ -168,11 +230,66 @@ export const rivalScopeApi = {
         ...payload,
       }),
     }),
-  updateMcpPolicy: (serverId: string, toolName: string, isEnabled: boolean, requireApproval: boolean) =>
+  updateMcpPolicy: (serverId: string, toolName: string, isEnabled: boolean, requireApproval: boolean, agentScope: string = "all") =>
     request(`/mcp-servers/${serverId}/policies`, {
       method: "PATCH",
-      body: JSON.stringify({ tool_name: toolName, is_enabled: isEnabled, require_approval: requireApproval }),
+      body: JSON.stringify({ tool_name: toolName, is_enabled: isEnabled, require_approval: requireApproval, agent_scope: agentScope }),
     }),
+  // Team & RBAC Management
+  users: () => request<ApiUser[]>("/users"),
+  createUser: (payload: { email: string; password: string; name?: string; role: string }) =>
+    request<ApiUser>("/users", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateUser: (userId: string, payload: { role?: string; is_active?: boolean; name?: string }) =>
+    request<ApiUser>(`/users/${userId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteUser: (userId: string) =>
+    request<unknown>(`/users/${userId}`, { method: "DELETE" }),
+  me: () => request<ApiUser>("/auth/me"),
+  // Document Knowledge Management (CSV, XLSX, DOCX, MD, TXT, JSON)
+  documents: () => request<ApiInternalDoc[]>("/documents"),
+  uploadDocument: async (file: File): Promise<ApiInternalDoc> => {
+    const token = typeof window === "undefined" ? null : localStorage.getItem("rivalscope_access_token");
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${apiBaseUrl}/api/v1/documents/upload`, {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Upload failed (${res.status})`);
+    }
+    return res.json();
+  },
+  deleteDocument: (docId: string) =>
+    request<unknown>(`/documents/${docId}`, { method: "DELETE" }),
+  // Internal Research Agent
+  internalResearch: (query: string, competitor?: string) =>
+    request<{
+      answer: string;
+      tenant_id: string;
+      internal_sources: Array<{ filename: string; file_type: string; snippet: string }>;
+      mcp_tools_used: Array<{ tool_name: string; server_id: string; agent_scope?: string }>;
+      web_sources: Array<{ title: string; url: string }>;
+    }>("/research/query", {
+      method: "POST",
+      body: JSON.stringify({ query, competitor }),
+    }),
+  researchStatus: () =>
+    request<{
+      uploaded_documents_count: number;
+      mcp_servers_count: number;
+      active_enabled_tools_count: number;
+      recent_audit_executions: Array<{ tool_name: string; status: string; duration_ms: number; timestamp: string }>;
+    }>("/research/status"),
   preferences: () => request<ApiPreference[]>("/memory/preferences"),
   addPreference: (category: string, memoryText: string) =>
     request<ApiPreference>("/memory/preferences", {
@@ -181,6 +298,7 @@ export const rivalScopeApi = {
     }),
   timeline: (companyId?: string) =>
     request<ApiTimelineEvent[]>(
+
       `/memory/timeline${companyId ? `?company_id=${companyId}` : ""}`
     ),
   chatSessions: () =>

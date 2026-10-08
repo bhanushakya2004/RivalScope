@@ -45,6 +45,7 @@ class User(Base):
         String(36), ForeignKey("tenants.id", ondelete="CASCADE"), index=True, nullable=False
     )
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(50), default="analyst")  # admin, analyst, viewer
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

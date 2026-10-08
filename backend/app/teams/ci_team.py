@@ -52,7 +52,15 @@ def create_ci_team(
                 [f"- {e['event_date'][:10]} [{e['category']}]: {e['title']}" for e in events]
             )
 
-        team_tools.extend([search_knowledge_base, get_competitor_timeline])
+        def query_internal_documents_and_metrics(query: str) -> str:
+            """Query internal uploaded enterprise documents (spreadsheets, docs) and internal knowledge base."""
+            results = memory.search_knowledge("default", query, limit=4)
+            internal_docs = [r for r in results if "internal://" in (r.get("url") or "")]
+            if internal_docs:
+                return "\n\n".join([f"[{r['url']}]: {r['content'][:400]}" for r in internal_docs])
+            return "No specific internal documents found; using general fintech context."
+
+        team_tools.extend([search_knowledge_base, get_competitor_timeline, query_internal_documents_and_metrics])
 
     if tools:
         if callable(tools):

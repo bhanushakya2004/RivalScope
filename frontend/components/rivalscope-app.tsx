@@ -38,11 +38,19 @@ import {
   Users,
   X,
   Zap,
+  FileSpreadsheet,
+  Upload,
+  Lock,
+  Eye,
+  AlertTriangle,
 } from "lucide-react";
 import {
   rivalScopeApi,
   type ApiChatSession,
   type ApiCompany,
+  type ApiInternalDoc,
+  type ApiMcpAuditLog,
+  type ApiMcpCatalogItem,
   type ApiMcpServer,
   type ApiPreference,
   type ApiReport,
@@ -50,6 +58,7 @@ import {
   type ApiSchedule,
   type ApiSignal,
   type ApiTimelineEvent,
+  type ApiUser,
 } from "../lib/api";
 
 type Signal = {
@@ -77,28 +86,34 @@ const navigation = [
   ["signals", "Signals", Activity],
   ["compare", "Compare", LineChart],
   ["reports", "Reports", FileText],
+  ["research", "Internal Research", Sparkles],
+  ["documents", "Knowledge Docs", FileSpreadsheet],
   ["runs", "Agent runs", Bot],
   ["schedules", "Schedules", CalendarClock],
-  ["integrations", "Integrations", Cloud],
-  ["mcp", "MCP gateway", Network],
+  ["team", "Team & RBAC", ShieldCheck],
+  ["mcp", "MCP Gateway", Network],
   ["memory", "Memory explorer", Database],
   ["settings", "Settings", Settings],
 ] as const;
 
 const pageTitles: Record<string, [string, string]> = {
-  dashboard: ["Good morning, Priya", "Here is the competitive picture across your watchlist."],
+  dashboard: ["Executive Dashboard", "Here is the verified competitive picture across your watchlist."],
   competitors: ["Competitors", "Track the companies that shape your market."],
   signals: ["Signals", "Evidence-backed moves ranked by strategic importance."],
   compare: ["Compare rivals", "Line up product, commercial, and momentum signals."],
   reports: ["Reports", "Cited intelligence briefs ready to share."],
+  research: ["Internal Research Agent", "Synthesize internal documentation, connected MCP tools, and competitor moves."],
+  documents: ["Knowledge Documentation", "Upload CSV, Excel (.xlsx), Word (.docx), and Markdown files for internal enterprise indexing."],
   runs: ["Agent runs", "Monitor collection, verification, and delivery in real time."],
   schedules: ["Schedules", "Control when intelligence reaches your team."],
+  team: ["Team & RBAC Management", "Stateless JWT authentication, user roles (Admin, Analyst, Viewer), and tenant access."],
   integrations: ["Integrations", "Connect delivery channels and provider credentials."],
-  mcp: ["MCP gateway", "Safely give agents access to tenant-approved tools."],
+  mcp: ["MCP Gateway Hub", "Uber-style MCP discovery, disabled-by-default policy matrix, and live audit logs."],
   memory: ["Memory explorer", "Inspect durable preferences, retrieved knowledge, and events."],
   settings: ["Settings", "Manage workspace security, data retention, and models."],
   onboarding: ["Welcome to RivalScope", "Set up your first competitive intelligence workflow."],
 };
+
 
 function Score({ score }: { score: number }) {
   const color =
@@ -894,19 +909,26 @@ function SchedulesView({
 
 function Mcp({
   servers,
+  auditLogs,
   onTogglePolicy,
   onAddServer,
+  onDiscoverServer,
+  onDeleteServer,
 }: {
   servers: ApiMcpServer[];
-  onTogglePolicy: (serverId: string, toolName: string, enabled: boolean, approval: boolean) => void;
+  auditLogs: ApiMcpAuditLog[];
+  onTogglePolicy: (serverId: string, toolName: string, enabled: boolean, approval: boolean, agentScope?: string) => void;
   onAddServer: (payload: { name: string; transport: string; url: string; auth_type: string; allowed_tools: string[] }) => void;
+  onDiscoverServer: (serverId: string) => Promise<void>;
+  onDeleteServer: (serverId: string) => Promise<void>;
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [transport, setTransport] = useState("streamable-http");
   const [authType, setAuthType] = useState("bearer");
-  const [toolsStr, setToolsStr] = useState("search_knowledge_base, get_competitor_timeline, get_company_signals");
+  const [toolsStr, setToolsStr] = useState("query_internal_financials, get_crm_deals, lookup_billing_rate");
+  const [discoveringId, setDiscoveringId] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -927,21 +949,30 @@ function Mcp({
     setShowAdd(false);
   };
 
+  const handleDiscover = async (serverId: string) => {
+    setDiscoveringId(serverId);
+    try {
+      await onDiscoverServer(serverId);
+    } finally {
+      setDiscoveringId(null);
+    }
+  };
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="panel flex flex-wrap items-center justify-between gap-4 p-5">
         <div>
-          <p className="eyebrow">Connector registry</p>
-          <h2 className="mt-1 text-lg font-bold">Tenant MCP servers</h2>
+          <p className="eyebrow">Uber-Style Enterprise Gateway</p>
+          <h2 className="mt-1 text-lg font-bold">MCP Servers & Tool Governance Matrix</h2>
           <p className="mt-1 text-sm text-slate-500">
-            SSRF Firewall & Dynamic Policy validation protecting agent tool use.
+            Automated JSON-RPC 2.0 discovery, disabled-by-default security policies, SSRF private IP validation, and cryptographic audit logs.
           </p>
         </div>
         <button
           onClick={() => setShowAdd(!showAdd)}
-          className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
+          className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 flex items-center gap-1.5"
         >
-          <Plus className="mr-1 inline h-4 w-4" /> Add server
+          <Plus className="h-4 w-4" /> Add MCP Server
         </button>
       </div>
 
@@ -955,7 +986,7 @@ function Mcp({
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Internal CRM Connector"
+                placeholder="e.g. Finance & Billing Gateway"
                 className="mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500"
               />
             </div>
@@ -964,7 +995,7 @@ function Mcp({
               <input
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="e.g. https://mcp.internal.firm.com/mcp"
+                placeholder="e.g. http://localhost:8001/mcp or https://internal-erp.corp"
                 className="mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500"
               />
             </div>
@@ -975,9 +1006,9 @@ function Mcp({
                 onChange={(e) => setTransport(e.target.value)}
                 className="mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500"
               >
-                <option value="streamable-http">streamable-http</option>
-                <option value="sse">sse</option>
-                <option value="stdio">stdio</option>
+                <option value="streamable-http">streamable-http (HTTP POST)</option>
+                <option value="sse">sse (Server-Sent Events)</option>
+                <option value="stdio">stdio (Local Subprocess)</option>
               </select>
             </div>
             <div>
@@ -987,14 +1018,14 @@ function Mcp({
                 onChange={(e) => setAuthType(e.target.value)}
                 className="mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500"
               >
-                <option value="bearer">bearer</option>
-                <option value="oauth">oauth</option>
-                <option value="none">none</option>
+                <option value="bearer">Bearer Token</option>
+                <option value="header">Custom Header (X-API-Key)</option>
+                <option value="none">None / Open</option>
               </select>
             </div>
             <div className="sm:col-span-2">
               <label className="text-xs font-semibold text-slate-600">
-                Allowed Tools (comma separated)
+                Declared Tools (comma separated)
               </label>
               <input
                 value={toolsStr}
@@ -1026,13 +1057,13 @@ function Mcp({
           <Network className="mx-auto h-8 w-8 text-slate-300" />
           <p className="mt-2 text-sm font-semibold text-slate-700">No MCP servers registered</p>
           <p className="mt-1 text-xs text-slate-400">
-            Register your first server to give agents access to approved tools.
+            Register your enterprise servers to give agents access to approved internal data tools.
           </p>
         </div>
       ) : (
         servers.map((server) => (
           <div className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]" key={server.id}>
-            <div className="panel p-5">
+            <div className="panel p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-bold text-slate-900">{server.name}</p>
@@ -1043,68 +1074,802 @@ function Mcp({
                 <span className="chip bg-emerald-100 text-emerald-700">{server.status}</span>
               </div>
               {server.url && (
-                <p className="mt-3 truncate rounded bg-slate-50 p-2 font-mono text-xs text-slate-600">
+                <p className="truncate rounded bg-slate-50 p-2 font-mono text-xs text-slate-600">
                   {server.url}
                 </p>
               )}
-              <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+              <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
                 <ShieldCheck className="mr-2 inline h-4 w-4 text-emerald-600" /> AES-256 envelope
                 encryption active & SSRF firewall validated
+              </div>
+              <div className="flex items-center gap-2 pt-2 border-t">
+                <button
+                  onClick={() => handleDiscover(server.id)}
+                  disabled={discoveringId === server.id}
+                  className="rounded-lg bg-indigo-50 border border-indigo-200 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 flex items-center gap-1.5 transition"
+                >
+                  {discoveringId === server.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
+                  Discover Tools (tools/list)
+                </button>
+                <button
+                  onClick={() => onDeleteServer(server.id)}
+                  className="rounded-lg border border-rose-200 p-1.5 text-rose-600 hover:bg-rose-50"
+                  title="Remove server"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               </div>
             </div>
 
             <div className="panel overflow-hidden">
-              <div className="border-b p-5">
-                <p className="font-bold">Tool policies</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Toggle tool access for this server. Write tools automatically require HITL human approval.
-                </p>
+              <div className="border-b p-5 flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-slate-900">Governance Policy Matrix</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Uber model: newly discovered tools start disabled by default. Configure agent scope and HITL human approval.
+                  </p>
+                </div>
               </div>
               {server.policies && server.policies.length > 0 ? (
-                server.policies.map((policy) => (
+                server.policies.map((policy: any) => (
                   <div
-                    className="flex items-center justify-between border-b p-4 last:border-0"
+                    className="flex flex-wrap items-center justify-between border-b p-4 last:border-0 gap-3"
                     key={policy.tool_name}
                   >
                     <div>
-                      <p className="font-semibold text-sm text-slate-800">{policy.tool_name}</p>
-                      <p className="mt-0.5 text-xs text-slate-500">
-                        {policy.require_approval ? "Requires Human Approval" : "Autonomous Read"}
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-sm text-slate-800 font-mono">{policy.tool_name}</p>
+                        {policy.is_enabled ? (
+                          <span className="chip bg-emerald-100 text-emerald-800 text-[10px]">Enabled</span>
+                        ) : (
+                          <span className="chip bg-slate-100 text-slate-600 text-[10px]">Disabled by default</span>
+                        )}
+                        <span className="chip bg-indigo-50 text-indigo-700 text-[10px]">
+                          Scope: {policy.agent_scope || "all"}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {policy.require_approval ? "Requires HITL human approval before dispatch" : "Autonomous Read access"}
                       </p>
                     </div>
-                    <button
-                      onClick={() =>
-                        onTogglePolicy(
-                          server.id,
-                          policy.tool_name,
-                          !policy.is_enabled,
-                          policy.require_approval
-                        )
-                      }
-                      className={`h-6 w-11 rounded-full p-0.5 transition ${
-                        policy.is_enabled ? "bg-indigo-600" : "bg-slate-200"
-                      }`}
-                    >
-                      <span
-                        className={`block h-5 w-5 rounded-full bg-white transition ${
-                          policy.is_enabled ? "translate-x-5" : ""
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={policy.agent_scope || "all"}
+                        onChange={(e) =>
+                          onTogglePolicy(
+                            server.id,
+                            policy.tool_name,
+                            policy.is_enabled,
+                            policy.require_approval,
+                            e.target.value
+                          )
+                        }
+                        className="rounded-lg border bg-white px-2 py-1 text-xs text-slate-700 outline-none"
+                      >
+                        <option value="all">All Agents</option>
+                        <option value="internal_research">Internal Research</option>
+                        <option value="analyst">Analyst Only</option>
+                      </select>
+                      <button
+                        onClick={() =>
+                          onTogglePolicy(
+                            server.id,
+                            policy.tool_name,
+                            !policy.is_enabled,
+                            policy.require_approval,
+                            policy.agent_scope || "all"
+                          )
+                        }
+                        className={`h-6 w-11 rounded-full p-0.5 transition ${
+                          policy.is_enabled ? "bg-indigo-600" : "bg-slate-200"
                         }`}
-                      />
-                    </button>
+                      >
+                        <span
+                          className={`block h-5 w-5 rounded-full bg-white transition ${
+                            policy.is_enabled ? "translate-x-5" : ""
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
                 ))
               ) : (
                 <div className="p-5 text-xs text-slate-400">
-                  Allowed tools: {(server.allowed_tools || []).join(", ") || "None"}
+                  No tools discovered yet. Click &quot;Discover Tools&quot; to probe this MCP server.
                 </div>
               )}
             </div>
           </div>
         ))
       )}
+
+      {/* Live MCP Audit Log */}
+      <div className="panel overflow-hidden">
+        <div className="border-b px-5 py-4 flex items-center justify-between">
+          <div>
+            <h3 className="font-bold text-slate-900">Live Gateway Execution Audit Trail</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Every MCP tool invocation is logged with duration, status, and payload sanitization.
+            </p>
+          </div>
+          <span className="chip bg-slate-100 text-slate-700 text-xs font-mono">
+            {auditLogs.length} logged calls
+          </span>
+        </div>
+
+        {auditLogs.length === 0 ? (
+          <div className="p-6 text-center text-xs text-slate-400">
+            No tool executions logged yet. Invocations from the Internal Research agent or CI team will appear here in real time.
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
+            {auditLogs.slice(0, 15).map((log) => {
+              const statusBadge =
+                log.status === "success"
+                  ? "bg-emerald-100 text-emerald-700"
+                  : log.status === "approval_required"
+                  ? "bg-amber-100 text-amber-700"
+                  : "bg-rose-100 text-rose-700";
+              return (
+                <div key={log.id} className="p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-slate-900">{log.tool_name}</span>
+                    <span className={`chip text-[10px] uppercase font-bold ${statusBadge}`}>{log.status}</span>
+                    <span className="text-slate-400">{log.duration_ms} ms</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {log.result_summary && (
+                      <span className="text-slate-500 max-w-xs truncate font-mono">
+                        {log.result_summary}
+                      </span>
+                    )}
+                    <span className="text-slate-400 font-mono">
+                      {new Date(log.created_at).toLocaleTimeString()}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
+function TeamView({
+  users,
+  currentUser,
+  onRefresh,
+}: {
+  users: ApiUser[];
+  currentUser: ApiUser | null;
+  onRefresh: () => void;
+}) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("analyst");
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) return;
+    setSaving(true);
+    setErrorMsg(null);
+    try {
+      await rivalScopeApi.createUser({
+        email: email.trim(),
+        name: name.trim() || undefined,
+        password: password.trim(),
+        role,
+      });
+      setEmail("");
+      setName("");
+      setPassword("");
+      setShowAdd(false);
+      onRefresh();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to create user");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleActive = async (user: ApiUser) => {
+    try {
+      await rivalScopeApi.updateUser(user.id, { is_active: !user.is_active });
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || "Failed to update user");
+    }
+  };
+
+  const handleDelete = async (userId: string) => {
+    if (!confirm("Are you sure you want to remove this user from the tenant?")) return;
+    try {
+      await rivalScopeApi.deleteUser(userId);
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || "Failed to remove user");
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="panel flex flex-wrap items-center justify-between gap-4 p-5">
+        <div>
+          <p className="eyebrow">Enterprise Access Control</p>
+          <h2 className="mt-1 text-lg font-bold">Team Members & RBAC Roles</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Stateless JWT authentication enforcing strict Admin, Analyst, and Viewer privilege tiers.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowAdd(!showAdd)}
+          className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 flex items-center gap-2"
+        >
+          <Plus className="h-4 w-4" /> Add Team Member
+        </button>
+      </div>
+
+      {showAdd && (
+        <form onSubmit={handleAddUser} className="panel border-indigo-200 bg-slate-50 p-5 space-y-4">
+          <h4 className="text-sm font-bold text-slate-800">Add New User to Organization</h4>
+          {errorMsg && (
+            <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
+              {errorMsg}
+            </div>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-semibold text-slate-600">Full Name</label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Alex Morgan"
+                className="mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600">Email Address *</label>
+              <input
+                required
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="alex@enterprise.corp"
+                className="mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600">Temporary Password *</label>
+              <input
+                required
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600">RBAC Role *</label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              >
+                <option value="analyst">Analyst (Analyze signals & run research)</option>
+                <option value="admin">Admin (Full tenant & MCP gateway control)</option>
+                <option value="viewer">Viewer (Read-only intelligence access)</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 flex items-center gap-1.5"
+            >
+              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Create Member
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAdd(false)}
+              className="rounded-lg border px-3 py-2 text-xs text-slate-600 hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Role explanation cards */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="panel p-4 border-l-4 border-l-purple-500">
+          <span className="chip bg-purple-100 text-purple-700 font-semibold text-xs">Admin</span>
+          <p className="mt-2 text-xs text-slate-600">
+            Full organizational authority. Manages team members, registers MCP servers, configures disabled-by-default tool policies, and approves HITL write actions.
+          </p>
+        </div>
+        <div className="panel p-4 border-l-4 border-l-blue-500">
+          <span className="chip bg-blue-100 text-blue-700 font-semibold text-xs">Analyst</span>
+          <p className="mt-2 text-xs text-slate-600">
+            Executes autonomous collection runs, queries Internal Research agent, generates cited intelligence briefs, and analyzes competitor counter-moves.
+          </p>
+        </div>
+        <div className="panel p-4 border-l-4 border-l-slate-400">
+          <span className="chip bg-slate-100 text-slate-700 font-semibold text-xs">Viewer</span>
+          <p className="mt-2 text-xs text-slate-600">
+            Auditing and consumption access. Views competitor dashboards, verified signals, and published strategic reports with zero mutating tool permissions.
+          </p>
+        </div>
+      </div>
+
+      {/* User list */}
+      <div className="panel overflow-hidden">
+        <div className="border-b px-5 py-4 flex items-center justify-between">
+          <h3 className="font-bold text-slate-900">Active Organization Members ({users.length})</h3>
+          <button
+            onClick={onRefresh}
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600"
+          >
+            <RefreshCw className="h-3.5 w-3.5" /> Refresh
+          </button>
+        </div>
+        <div className="divide-y divide-slate-100">
+          {users.map((u) => {
+            const roleBadge =
+              u.role === "admin"
+                ? "bg-purple-100 text-purple-700"
+                : u.role === "analyst"
+                ? "bg-blue-100 text-blue-700"
+                : "bg-slate-100 text-slate-700";
+            return (
+              <div key={u.id} className="p-4 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-700 text-sm uppercase">
+                    {(u.name || u.email).slice(0, 2)}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm text-slate-900">{u.name || u.email.split("@")[0]}</span>
+                      <span className={`chip text-[10px] font-semibold uppercase ${roleBadge}`}>{u.role}</span>
+                      {u.is_active ? (
+                        <span className="chip bg-emerald-100 text-emerald-700 text-[10px]">Active</span>
+                      ) : (
+                        <span className="chip bg-rose-100 text-rose-700 text-[10px]">Disabled</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 font-mono mt-0.5">{u.email}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleToggleActive(u)}
+                    className="rounded-lg border px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  >
+                    {u.is_active ? "Deactivate" : "Activate"}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(u.id)}
+                    className="rounded-lg border border-rose-200 p-1.5 text-rose-600 hover:bg-rose-50"
+                    title="Remove member"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DocumentsView({
+  documents,
+  onRefresh,
+}: {
+  documents: ApiInternalDoc[];
+  onRefresh: () => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<ApiInternalDoc | null>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setErrorMsg(null);
+    try {
+      await rivalScopeApi.uploadDocument(file);
+      onRefresh();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Upload failed");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleDelete = async (docId: string) => {
+    if (!confirm("Are you sure you want to remove this document and delete its vector chunks?")) return;
+    try {
+      await rivalScopeApi.deleteDocument(docId);
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || "Failed to delete document");
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="panel flex flex-wrap items-center justify-between gap-4 p-5">
+        <div>
+          <p className="eyebrow">Enterprise Knowledge Ingestion</p>
+          <h2 className="mt-1 text-lg font-bold">Document Knowledge Center</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Upload CSV, Excel (.xlsx), Word (.docx), and Markdown files. Extracted tabular data and text chunks are indexed in pgvector hybrid search for internal research.
+          </p>
+        </div>
+      </div>
+
+      {/* Upload Box */}
+      <div className="panel p-6 border-dashed border-2 border-indigo-200 bg-indigo-50/20 text-center">
+        <FileSpreadsheet className="mx-auto h-10 w-10 text-indigo-500" />
+        <h3 className="mt-2 text-sm font-bold text-slate-800">Upload Enterprise Files</h3>
+        <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto">
+          Supported: <strong>CSV, Excel (.xlsx, .xls), Word (.docx), Markdown (.md), Plain Text (.txt), JSON</strong> (Max 25MB). Tabular rows are converted into structured Markdown preview tables and embedded into pgvector.
+        </p>
+        <p className="mt-1 text-[11px] text-slate-400">
+          *(Note: PDF OCR scanning is intentionally excluded for high-speed deterministic ingestion).*
+        </p>
+
+        {errorMsg && (
+          <div className="mt-3 inline-block rounded-lg bg-rose-50 border border-rose-200 px-4 py-2 text-xs text-rose-700">
+            {errorMsg}
+          </div>
+        )}
+
+        <div className="mt-4">
+          <label className="cursor-pointer inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition">
+            {uploading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Ingesting & Embedding...
+              </>
+            ) : (
+              <>
+                <Upload className="h-4 w-4" /> Select File to Upload
+              </>
+            )}
+            <input
+              type="file"
+              disabled={uploading}
+              onChange={handleFileUpload}
+              accept=".csv,.xlsx,.xls,.docx,.doc,.md,.markdown,.txt,.json"
+              className="hidden"
+            />
+          </label>
+        </div>
+      </div>
+
+      {/* Document Catalog */}
+      <div className="panel overflow-hidden">
+        <div className="border-b px-5 py-4 flex items-center justify-between">
+          <h3 className="font-bold text-slate-900">Indexed Knowledge Documents ({documents.length})</h3>
+          <button
+            onClick={onRefresh}
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600"
+          >
+            <RefreshCw className="h-3.5 w-3.5" /> Refresh
+          </button>
+        </div>
+
+        {documents.length === 0 ? (
+          <div className="p-8 text-center text-slate-500">
+            <Database className="mx-auto h-8 w-8 text-slate-300" />
+            <p className="mt-2 text-sm font-semibold text-slate-700">No documents uploaded yet</p>
+            <p className="mt-1 text-xs text-slate-400">
+              Upload spreadsheets or contract docs above to empower the Internal Research Agent.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {documents.map((doc) => {
+              const extBadge =
+                doc.file_type === "csv"
+                  ? "bg-emerald-100 text-emerald-800"
+                  : doc.file_type === "xlsx" || doc.file_type === "xls"
+                  ? "bg-green-100 text-green-800"
+                  : doc.file_type === "docx"
+                  ? "bg-blue-100 text-blue-800"
+                  : "bg-slate-100 text-slate-800";
+              const sizeKb = Math.round(doc.file_size_bytes / 1024);
+              return (
+                <div key={doc.id} className="p-4 flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm text-slate-900">{doc.filename}</span>
+                      <span className={`chip text-[10px] font-bold uppercase ${extBadge}`}>{doc.file_type}</span>
+                      <span className="chip bg-sky-100 text-sky-800 text-[10px]">{doc.status}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {doc.row_count} rows/paragraphs · {sizeKb} KB · {doc.column_names?.length ? `${doc.column_names.length} columns (${doc.column_names.slice(0, 3).join(", ")}...)` : "Structured text"}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{doc.summary}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setPreviewDoc(doc)}
+                      className="rounded-lg border px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-1.5"
+                    >
+                      <Eye className="h-3.5 w-3.5" /> Preview
+                    </button>
+                    <button
+                      onClick={() => handleDelete(doc.id)}
+                      className="rounded-lg border border-rose-200 p-1.5 text-rose-600 hover:bg-rose-50"
+                      title="Delete document"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Preview Modal */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="font-bold text-slate-900">{previewDoc.filename}</h3>
+                <p className="text-xs text-slate-500">
+                  {previewDoc.file_type.toUpperCase()} · {previewDoc.row_count} rows · {Math.round(previewDoc.file_size_bytes / 1024)} KB
+                </p>
+              </div>
+              <button
+                onClick={() => setPreviewDoc(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-700 uppercase">Extraction Summary</h4>
+              <p className="text-sm text-slate-600 mt-1">{previewDoc.summary}</p>
+            </div>
+            {previewDoc.column_names && previewDoc.column_names.length > 0 && (
+              <div>
+                <h4 className="text-xs font-bold text-slate-700 uppercase">Detected Columns / Headers</h4>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {previewDoc.column_names.map((col) => (
+                    <span key={col} className="chip bg-slate-100 text-slate-700 text-xs">
+                      {col}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {Boolean(previewDoc.metadata_json?.preview_snippet) && (
+              <div>
+                <h4 className="text-xs font-bold text-slate-700 uppercase">Markdown Preview Snippet</h4>
+                <pre className="mt-1 max-h-60 overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-800 font-mono whitespace-pre-wrap">
+                  {String(previewDoc.metadata_json?.preview_snippet)}
+                </pre>
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={() => setPreviewDoc(null)}
+                className="rounded-lg bg-slate-800 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-900"
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ResearchView({
+  companies,
+  documentsCount,
+  mcpToolsCount,
+}: {
+  companies: ApiCompany[];
+  documentsCount: number;
+  mcpToolsCount: number;
+}) {
+  const [query, setQuery] = useState("");
+  const [competitor, setCompetitor] = useState("all");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{
+    answer: string;
+    internal_sources: Array<{ filename: string; file_type: string; snippet: string }>;
+    mcp_tools_used: Array<{ tool_name: string; server_id: string; agent_scope?: string }>;
+    web_sources: Array<{ title: string; url: string }>;
+  } | null>(null);
+
+  const quickPrompts = [
+    "Compare our Q3 gross payment volume and take-rate vs Stripe agentic commerce",
+    "Which CRM deals did we lose to Adyen or Stripe and what were the cited objections?",
+    "Summarize our active billing tiers, interchange schedules, and volume discounts",
+    "What initiatives are planned in our internal engineering roadmap sprint?",
+  ];
+
+  const handleRun = async (promptQuery?: string) => {
+    const q = (promptQuery || query).trim();
+    if (!q || loading) return;
+    if (promptQuery) setQuery(promptQuery);
+    setLoading(true);
+    try {
+      const res = await rivalScopeApi.internalResearch(
+        q,
+        competitor !== "all" ? competitor : undefined
+      );
+      setResult(res);
+    } catch (err: any) {
+      alert(err.message || "Research query failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="panel p-5">
+        <p className="eyebrow">Enterprise Intelligence Synthesis</p>
+        <h2 className="mt-1 text-lg font-bold">Internal Research Agent</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Synthesizes internal uploaded documentation (spreadsheets, docs), connected MCP tools (finance, CRM, billing), and live market signals into executive answers.
+        </p>
+
+        {/* Stats bar */}
+        <div className="mt-4 flex flex-wrap gap-4 text-xs font-medium text-slate-600">
+          <span className="flex items-center gap-1.5 bg-slate-100 rounded-lg px-2.5 py-1">
+            <FileSpreadsheet className="h-3.5 w-3.5 text-indigo-600" /> {documentsCount} Indexed Internal Docs
+          </span>
+          <span className="flex items-center gap-1.5 bg-slate-100 rounded-lg px-2.5 py-1">
+            <Network className="h-3.5 w-3.5 text-emerald-600" /> {mcpToolsCount} Active Enabled MCP Tools
+          </span>
+          <span className="flex items-center gap-1.5 bg-slate-100 rounded-lg px-2.5 py-1">
+            <ShieldCheck className="h-3.5 w-3.5 text-purple-600" /> Zero Hallucination Citations
+          </span>
+        </div>
+      </div>
+
+      {/* Query Bar */}
+      <div className="panel p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleRun()}
+              placeholder="Ask anything bridging internal metrics & competitor moves..."
+              className="w-full rounded-xl border bg-white px-4 py-3 text-sm outline-none focus:border-indigo-500 shadow-sm"
+            />
+          </div>
+          <select
+            value={competitor}
+            onChange={(e) => setCompetitor(e.target.value)}
+            className="rounded-xl border bg-white px-3 py-3 text-sm outline-none focus:border-indigo-500"
+          >
+            <option value="all">Cross-Reference All Rivals</option>
+            {companies.filter((c) => !c.is_self).map((c) => (
+              <option key={c.id} value={c.name}>
+                Focus: {c.name}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => handleRun()}
+            disabled={loading || !query.trim()}
+            className="rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            Run Research
+          </button>
+        </div>
+
+        {/* Prompt Chips */}
+        <div>
+          <p className="text-xs font-semibold text-slate-500 mb-2">Suggested Research Prompts:</p>
+          <div className="flex flex-wrap gap-2">
+            {quickPrompts.map((p) => (
+              <button
+                key={p}
+                onClick={() => handleRun(p)}
+                className="rounded-lg border bg-slate-50 px-2.5 py-1 text-xs text-slate-700 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 transition text-left"
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Output Panel */}
+      {result && (
+        <div className="space-y-4">
+          <div className="panel p-6">
+            <div className="mb-4 flex items-center justify-between border-b pb-3">
+              <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-indigo-600" /> Synthesized Strategic Deliverable
+              </h3>
+              <button
+                onClick={() => setResult(null)}
+                className="text-xs text-slate-400 hover:text-slate-600"
+              >
+                Clear
+              </button>
+            </div>
+            <div className="prose prose-sm max-w-none text-slate-800 leading-relaxed whitespace-pre-wrap font-sans">
+              {result.answer}
+            </div>
+          </div>
+
+          {/* Sources breakdown */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="panel p-5">
+              <h4 className="text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
+                <FileSpreadsheet className="h-4 w-4 text-indigo-600" /> Internal Documents Grounding
+              </h4>
+              <div className="mt-3 space-y-2">
+                {result.internal_sources.length === 0 ? (
+                  <p className="text-xs text-slate-400">No specific internal document chunks matched.</p>
+                ) : (
+                  result.internal_sources.map((s, idx) => (
+                    <div key={idx} className="rounded-lg bg-slate-50 p-2.5 text-xs border">
+                      <span className="font-semibold text-slate-800">`{s.filename}`</span>
+                      <p className="text-slate-500 mt-1 line-clamp-2">{s.snippet}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="panel p-5">
+              <h4 className="text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
+                <Network className="h-4 w-4 text-emerald-600" /> MCP Tools & Gateway Execution
+              </h4>
+              <div className="mt-3 space-y-2">
+                {result.mcp_tools_used.length === 0 ? (
+                  <p className="text-xs text-slate-400">No external MCP tools were required.</p>
+                ) : (
+                  result.mcp_tools_used.map((t, idx) => (
+                    <div key={idx} className="flex items-center justify-between rounded-lg bg-slate-50 p-2.5 text-xs border">
+                      <span className="font-mono font-semibold text-slate-800">{t.tool_name}</span>
+                      <span className="chip bg-emerald-100 text-emerald-700 text-[10px]">Executed via Gateway</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function formatDetails(details: unknown): string {
   if (!details) return "";
@@ -1430,6 +2195,10 @@ export function RivalScopeApp({ section }: { section: string }) {
   const [mcpServers, setMcpServers] = useState<ApiMcpServer[]>([]);
   const [preferences, setPreferences] = useState<ApiPreference[]>([]);
   const [timeline, setTimeline] = useState<ApiTimelineEvent[]>([]);
+  const [users, setUsers] = useState<ApiUser[]>([]);
+  const [documents, setDocuments] = useState<ApiInternalDoc[]>([]);
+  const [auditLogs, setAuditLogs] = useState<ApiMcpAuditLog[]>([]);
+  const [currentUser, setCurrentUser] = useState<ApiUser | null>(null);
   const [apiStatus, setApiStatus] = useState<"demo" | "connected">("demo");
   const [pipelineRunning, setPipelineRunning] = useState(false);
   const [reportGenerating, setReportGenerating] = useState(false);
@@ -1448,6 +2217,10 @@ export function RivalScopeApp({ section }: { section: string }) {
       rivalScopeApi.preferences().catch(() => [] as ApiPreference[]),
       rivalScopeApi.timeline().catch(() => [] as ApiTimelineEvent[]),
       rivalScopeApi.chatSessions().catch(() => [] as ApiChatSession[]),
+      rivalScopeApi.users().catch(() => [] as ApiUser[]),
+      rivalScopeApi.documents().catch(() => [] as ApiInternalDoc[]),
+      rivalScopeApi.mcpAuditLogs().catch(() => ({ total: 0, logs: [] as ApiMcpAuditLog[] })),
+      rivalScopeApi.me().catch(() => null),
     ])
       .then(
         ([
@@ -1460,6 +2233,10 @@ export function RivalScopeApp({ section }: { section: string }) {
           apiPrefs,
           apiTime,
           apiSessions,
+          apiUsers,
+          apiDocs,
+          apiAudit,
+          me,
         ]) => {
           const names = new Map(apiCompanies.map((c) => [c.id, c.name]));
           if (apiSignals.length) {
@@ -1487,6 +2264,10 @@ export function RivalScopeApp({ section }: { section: string }) {
           setPreferences(apiPrefs);
           setTimeline(apiTime);
           setChatSessions(apiSessions);
+          setUsers(apiUsers);
+          setDocuments(apiDocs);
+          setAuditLogs(apiAudit.logs || []);
+          if (me) setCurrentUser(me);
           setApiStatus("connected");
         }
       )
@@ -1552,16 +2333,16 @@ export function RivalScopeApp({ section }: { section: string }) {
   );
 
   const handleTogglePolicy = useCallback(
-    async (serverId: string, toolName: string, enabled: boolean, approval: boolean) => {
+    async (serverId: string, toolName: string, enabled: boolean, approval: boolean, agentScope: string = "all") => {
       try {
-        await rivalScopeApi.updateMcpPolicy(serverId, toolName, enabled, approval);
+        await rivalScopeApi.updateMcpPolicy(serverId, toolName, enabled, approval, agentScope);
         setMcpServers((cur) =>
           cur.map((s) => {
             if (s.id !== serverId) return s;
             return {
               ...s,
-              policies: s.policies.map((p) =>
-                p.tool_name === toolName ? { ...p, is_enabled: enabled, require_approval: approval } : p
+              policies: s.policies.map((p: any) =>
+                p.tool_name === toolName ? { ...p, is_enabled: enabled, require_approval: approval, agent_scope: agentScope } : p
               ),
             };
           })
@@ -1572,6 +2353,32 @@ export function RivalScopeApp({ section }: { section: string }) {
     },
     []
   );
+
+  const handleDiscoverMcpServer = useCallback(
+    async (serverId: string) => {
+      try {
+        await rivalScopeApi.discoverMcpTools(serverId);
+        refreshData();
+      } catch (err: any) {
+        alert(err.message || "Discovery failed");
+      }
+    },
+    [refreshData]
+  );
+
+  const handleDeleteMcpServer = useCallback(
+    async (serverId: string) => {
+      if (!confirm("Are you sure you want to remove this MCP server?")) return;
+      try {
+        await rivalScopeApi.deleteMcpServer(serverId);
+        refreshData();
+      } catch (err: any) {
+        alert(err.message || "Failed to remove MCP server");
+      }
+    },
+    [refreshData]
+  );
+
 
   const handleAddMcpServer = useCallback(
     async (payload: {
@@ -1761,12 +2568,34 @@ export function RivalScopeApp({ section }: { section: string }) {
     if (resolvedSection === "schedules") {
       return <SchedulesView schedules={schedules} onRunNow={handleRunScheduleNow} />;
     }
+    if (resolvedSection === "research") {
+      const activeToolsCount = mcpServers.reduce(
+        (acc, s) => acc + (s.policies?.filter((p: any) => p.is_enabled).length || 0),
+        0
+      );
+      return (
+        <ResearchView
+          companies={companies}
+          documentsCount={documents.length}
+          mcpToolsCount={activeToolsCount}
+        />
+      );
+    }
+    if (resolvedSection === "documents") {
+      return <DocumentsView documents={documents} onRefresh={refreshData} />;
+    }
+    if (resolvedSection === "team") {
+      return <TeamView users={users} currentUser={currentUser} onRefresh={refreshData} />;
+    }
     if (resolvedSection === "mcp") {
       return (
         <Mcp
           servers={mcpServers}
+          auditLogs={auditLogs}
           onTogglePolicy={handleTogglePolicy}
           onAddServer={handleAddMcpServer}
+          onDiscoverServer={handleDiscoverMcpServer}
+          onDeleteServer={handleDeleteMcpServer}
         />
       );
     }
@@ -1788,10 +2617,15 @@ export function RivalScopeApp({ section }: { section: string }) {
     }
     return <Dashboard items={liveSignals} companies={companies} mcpServers={mcpServers} onSelect={setSelectedSignal} onTriggerRun={handleTriggerRun} running={pipelineRunning} />;
   }, [
+    auditLogs,
     companies,
+    currentUser,
+    documents,
     handleAddCompany,
     handleAddMcpServer,
     handleAddPreference,
+    handleDeleteMcpServer,
+    handleDiscoverMcpServer,
     handleGenerateReport,
     handleRunScheduleNow,
     handleTogglePolicy,
@@ -1807,7 +2641,9 @@ export function RivalScopeApp({ section }: { section: string }) {
     runs,
     schedules,
     timeline,
+    users,
   ]);
+
 
   return (
     <div className="min-h-screen bg-[#f5f7fb]">
@@ -1872,11 +2708,22 @@ export function RivalScopeApp({ section }: { section: string }) {
               <Bell className="h-4 w-4" />
               <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-rose-500" />
             </button>
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-700">
-              PS
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white uppercase shadow-sm">
+                {(currentUser?.name || currentUser?.email || "Admin").slice(0, 2)}
+              </div>
+              <div className="hidden sm:block text-left">
+                <p className="text-xs font-bold text-slate-800 leading-tight">
+                  {currentUser?.name || currentUser?.email?.split("@")[0] || "Admin"}
+                </p>
+                <span className="text-[10px] font-semibold uppercase text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded">
+                  {currentUser?.role || "Admin"}
+                </span>
+              </div>
             </div>
           </div>
         </header>
+
 
         <section className="px-5 pb-10 pt-7 lg:px-8">
           <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
